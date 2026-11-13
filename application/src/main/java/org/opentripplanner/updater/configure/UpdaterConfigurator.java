@@ -19,6 +19,8 @@ import org.opentripplanner.framework.application.OTPFeature;
 import org.opentripplanner.framework.io.OtpHttpClientFactory;
 import org.opentripplanner.gbfs.network.GbfsNetworkOverrides;
 import org.opentripplanner.routing.impl.DelegatingTransitAlertServiceImpl;
+import org.opentripplanner.service.elevatorstatus.ElevatorStatusRepository;
+import org.opentripplanner.service.elevatorstatus.ElevatorStatusRepositorySnapshot;
 import org.opentripplanner.service.realtimevehicles.RealtimeVehicleRepository;
 import org.opentripplanner.service.realtimevehicles.RealtimeVehicleRepositorySnapshot;
 import org.opentripplanner.service.vehicleparking.VehicleParkingRepository;
@@ -93,6 +95,10 @@ public class UpdaterConfigurator {
   private final UpdateManager transitUpdateManager;
   private final UpdateManager streetUpdateManager;
   private final RepositoryHandle<
+    ElevatorStatusRepositorySnapshot,
+    ElevatorStatusRepository
+  > elevatorStatusRepositoryHandle;
+  private final RepositoryHandle<
     TimetableRepositorySnapshot,
     TimetableRepository
   > timetableRepositoryHandle;
@@ -119,6 +125,10 @@ public class UpdaterConfigurator {
     UpdateManager transitUpdateManager,
     UpdateManager streetUpdateManager,
     RepositoryHandle<TimetableRepositorySnapshot, TimetableRepository> timetableRepositoryHandle,
+    RepositoryHandle<
+      ElevatorStatusRepositorySnapshot,
+      ElevatorStatusRepository
+    > elevatorStatusRepositoryHandle,
     DelegatingTransitAlertServiceImpl transitAlertService,
     UpdatersParameters updatersParameters,
     GbfsNetworkOverrides gbfsNetworkOverrides
@@ -135,6 +145,7 @@ public class UpdaterConfigurator {
     this.transitUpdateManager = transitUpdateManager;
     this.streetUpdateManager = streetUpdateManager;
     this.timetableRepositoryHandle = timetableRepositoryHandle;
+    this.elevatorStatusRepositoryHandle = elevatorStatusRepositoryHandle;
     this.carpoolingRepository = carpoolingRepository;
     this.routableCarpoolTripResolver = routableCarpoolTripResolver;
     this.carpoolingParameters = carpoolingParameters;
@@ -160,6 +171,10 @@ public class UpdaterConfigurator {
     UpdateManager transitUpdateManager,
     UpdateManager streetUpdateManager,
     RepositoryHandle<TimetableRepositorySnapshot, TimetableRepository> timetableRepositoryHandle,
+    RepositoryHandle<
+      ElevatorStatusRepositorySnapshot,
+      ElevatorStatusRepository
+    > elevatorStatusRepositoryHandle,
     DelegatingTransitAlertServiceImpl transitAlertService,
     UpdatersParameters updatersParameters,
     GbfsNetworkOverrides gbfsNetworkOverrides
@@ -179,6 +194,7 @@ public class UpdaterConfigurator {
       transitUpdateManager,
       streetUpdateManager,
       timetableRepositoryHandle,
+      elevatorStatusRepositoryHandle,
       transitAlertService,
       updatersParameters,
       gbfsNetworkOverrides
@@ -209,6 +225,7 @@ public class UpdaterConfigurator {
       transitUpdateManager,
       timetableRepositoryHandle,
       realtimeVehicleRepositoryHandle,
+      elevatorStatusRepositoryHandle,
       transitRepository
     );
     var streetWriterService = GraphWriterService.forStreetDomain(streetUpdateManager, graph);
