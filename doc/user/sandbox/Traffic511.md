@@ -11,23 +11,42 @@ From the root of the fork checkout, select the branch with `git switch traffic-5
 
 ### Build the sandbox image
 
-From Bash on a Linux Docker host, build the image used in the Linux example below.
+From Bash on a Linux Docker host with BuildKit, build the current checkout, including local
+edits. The helper leaves the shaded JAR in `otp-shaded/target/` and tags the image
+`otp-traffic-511:local`.
 
 ```bash
 bash script/traffic-511/build_publish.sh
 ```
 
-The script builds the shaded JAR with JDK 25, bundles it in a Java 25 runtime image, and tags
-the image `otp-traffic-511:local`. To publish, log in to your registry and supply your own
-registry, repository and tag in place of the example.
+If this checkout already has `otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar` built from
+the same revision, set `useJarShaded=1` to reuse it. To publish either build, log in to your
+registry and supply your own repository and tag with `--publish`.
 
 ```bash
 IMAGE=registry.example.org/transit/otp:traffic-511 bash script/traffic-511/build_publish.sh --publish
 ```
 
+For a pipeline that calls `docker build` directly, use the repository root as the build context.
+Choose one of these commands.
+
+```shell
+# Build the published traffic-511 branch with Maven and JDK 25.
+docker build -f script/traffic-511/Containerfile --build-arg useJarShaded=0 -t otp-traffic-511:local .
+
+# Package the shaded JAR and scripts from the current checkout.
+docker build -f script/traffic-511/Containerfile --build-arg useJarShaded=1 -t otp-traffic-511:local .
+```
+
+Direct source builds default to `traffic-511` on the AC Transit fork. Add
+`--build-arg OTP_REF=<full-commit-sha>` to pin a revision. Both modes produce a Temurin 25
+Alpine JRE image with `/app/app.jar`, the matching `/app/script/` directory, and port 8080.
+The entrypoint supplies `/var/opentripplanner` when you pass `--build --save` or `--load --serve`.
+The feed capture and refresh commands below run on the host with their Python dependencies.
+
 ### Build the JAR directly
 
-The image build runs Spotless and Java Checkstyle. To run the same Maven build manually inside
+Building from source runs Spotless and Java Checkstyle. To run the Maven build manually inside
 `maven:3-eclipse-temurin-25`, start in the repository root. The first two commands put the
 project's pinned Node.js and npm on `PATH` before Spotless starts. If Node 24 and npm are
 already on `PATH`, run just the final command.

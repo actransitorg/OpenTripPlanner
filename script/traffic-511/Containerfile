@@ -1,6 +1,28 @@
-FROM eclipse-temurin:25-jre
-COPY otp-shaded-2.11.0-SNAPSHOT.jar /opt/otp.jar
+# syntax=docker/dockerfile:1
+ARG useJarShaded=0
+
+FROM maven:3-eclipse-temurin-25 AS branch-usejarshaded-0
+WORKDIR /src
+ARG OTP_REF=traffic-511
+# Maven reads Git metadata when it stamps the application version.
+ADD --keep-git-dir=true https://github.com/actransitorg/OpenTripPlanner.git#${OTP_REF} .
+RUN mvn -f client/pom.xml frontend:install-node-and-npm@install-node-and-npm \
+    && export PATH="$PWD/client/target/frontend/node:$PATH" \
+    && mvn -pl otp-shaded -am package -DskipTests \
+    && mv otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar app.jar
+
+FROM scratch AS branch-usejarshaded-1
+WORKDIR /src
+COPY otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar app.jar
+COPY script/ script/
+
+FROM branch-usejarshaded-${useJarShaded} AS build
+
+FROM eclipse-temurin:25-jre-alpine AS production
+WORKDIR /app
+COPY --from=build /src/app.jar ./app.jar
+COPY --from=build /src/script/ ./script/
 ENV RG_STATIC_URI=file:///var/opentripplanner/511-snapshot/RG.gtfs.zip \
     RG_RT_URI=file:///var/opentripplanner/511-live
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/opt/otp.jar", "/var/opentripplanner"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar", "/var/opentripplanner"]

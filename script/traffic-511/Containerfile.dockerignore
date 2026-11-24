@@ -1,0 +1,6 @@
+**
+!script
+!otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar
+**/__pycache__
+**/.env
+**/.env.*
