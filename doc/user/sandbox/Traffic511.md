@@ -7,23 +7,32 @@ reported closures and measured freeway speeds during street routing.
 
 ## Build and serve regional transit
 
-Set `511_API_KEY` in the download process's environment. The examples use `uv` to run Python
-with the official GTFS-Realtime bindings. From the repository root, capture the
-active regional schedule and all three realtime feeds to a new directory.
+Use the shaded JAR built from the `traffic-511` branch and Java 25. In a fresh clone of the
+fork, run `git switch traffic-511`, then `mvn -pl otp-shaded -am package -DskipTests` at the
+repository root with JDK 25, Maven, Node.js and npm available. The result is under
+`otp-shaded/target/`.
 
-```shell
-uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --regional-transit /data/511-snapshot
+Use a data directory with the following layout on either platform:
+
+```text
+otp/           build-config.json, router-config.json, Bay Area .osm.pbf, and the resulting graph.obj
+511-snapshot/  RG.gtfs.zip, tripupdates.pb, alerts.pb, vehiclepositions.pb, captured-at.txt
+511-live/      tripupdates.pb, alerts.pb, vehiclepositions.pb refreshed by the download process
 ```
 
-The command requests `operator_id=RG` for static GTFS and `agency=RG` for TripUpdates,
-ServiceAlerts and VehiclePositions. Keep the capture with its timestamp when replaying trips.
-Use the same OTP feed ID for the timetable and each realtime updater. Configure the static source
-in `build-config.json` and supply a Bay Area OSM extract for street routing.
+The capture command creates `511-snapshot` and requests `operator_id=RG` for static GTFS and
+`agency=RG` for TripUpdates, ServiceAlerts and VehiclePositions. Use `RG` as the OTP feed ID
+for all four. Save the JSON below in the `otp` directory. OTP substitutes the two environment
+variables before parsing the files. The Windows and container instructions below set them to
+the paths visible to the Java process. To route around road closures, also enable the sandbox
+in `otp-config.json` before building the graph. [Road configuration](#add-road-conditions-to-street-legs) · [OTP configuration substitution](../Configuration.md#system-environment-and-project-information-substitution)
+
+**`build-config.json`**
 
 ```json
 {
   "transitFeeds": [
-    { "type": "gtfs", "feedId": "RG", "source": "file:///data/511-snapshot/RG.gtfs.zip" }
+    { "type": "gtfs", "feedId": "RG", "source": "${RG_STATIC_URI}" }
   ]
 }
 ```
@@ -38,32 +47,100 @@ The optional stop-sequence reconciliation below checks explicit stop IDs against
 trip. It can recover one-based positions and out-of-order records when the evidence uniquely
 identifies each stop and supports its position on that trip.
 
-```shell
-uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --refresh-transit /data/511-live
-```
+**`router-config.json`**
 
 ```json
 {
   "updaters": [
     { "type": "stop-time-updater", "feedId": "RG", "frequency": "1m",
       "reconcileStopSequence": true,
-      "url": "file:///data/511-live/tripupdates.pb" },
+      "url": "${RG_RT_URI}/tripupdates.pb" },
     { "type": "real-time-alerts", "feedId": "RG", "frequency": "1m",
-      "url": "file:///data/511-live/alerts.pb" },
+      "url": "${RG_RT_URI}/alerts.pb" },
     { "type": "vehicle-positions", "feedId": "RG", "frequency": "1m",
-      "url": "file:///data/511-live/vehiclepositions.pb" }
+      "url": "${RG_RT_URI}/vehiclepositions.pb" }
   ]
 }
 ```
 
-Place the configuration files and OSM extract in `/data/otp`. Build the graph with
-`java -jar otp.jar --build --save /data/otp`, then serve it with
-`java -jar otp.jar --load /data/otp`. For a fixed replay, point the three URLs at
-`/data/511-snapshot`, set each polling frequency to `0s`, and plan for the capture date and time.
-Rebuild the graph when adopting a new static timetable. This branch uses graph serialization
-version 293, so a graph built with version 292 also needs rebuilding. The regional replay
-report includes an agency-predicted missed connection and its replacement itinerary.
+### Windows PowerShell
+
+From the repository root, set `JAVA_HOME` to the installed JDK 25 directory. Set `511_API_KEY`
+in the account running the download commands. If you just saved a Windows user environment
+variable, open a new PowerShell window to pick it up. Install `uv` for the Python commands.
+
+```powershell
+$data = 'C:\otp-data'
+$otp = Join-Path $data 'otp'
+$java = Join-Path $env:JAVA_HOME 'bin\java.exe'
+$jar = (Resolve-Path 'otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar').Path
+& $java -version
+New-Item -ItemType Directory -Force $otp | Out-Null
+uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --regional-transit "$data\511-snapshot"
+$env:RG_STATIC_URI = ([uri](Join-Path $data '511-snapshot\RG.gtfs.zip')).AbsoluteUri
+$env:RG_RT_URI = ([uri](Join-Path $data '511-live')).AbsoluteUri
+```
+
+Save the configuration and OSM extract in `$otp`. Start the following command in a second
+PowerShell window from the repository root. Wait for the three realtime files to appear.
+
+```powershell
+uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --refresh-transit 'C:\otp-data\511-live'
+```
+
+Build and serve in the first window:
+
+```powershell
+& $java -jar $jar --build --save $otp
+& $java -jar $jar --load --bindAddress 127.0.0.1 $otp
+```
+
+### Linux container
+
+The example uses Bash on a Linux host, the branch JAR and a Temurin Java 25 Linux container.
+From the repository root, create a host data directory and place the configuration and OSM
+extract in its `otp` subdirectory. Run the capture helper on the host. If your secret manager
+supplies a shell variable named `BAY_AREA_511_KEY`, `env` passes it to the helper under the
+name `511_API_KEY`. If the process already inherits `511_API_KEY`, invoke `uv` directly.
+
+```bash
+data="$HOME/otp-data"
+mkdir -p "$data/otp"
+env "511_API_KEY=$BAY_AREA_511_KEY" uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --regional-transit "$data/511-snapshot"
+```
+
+Run the live refresh in a separate terminal or service with the same host data directory:
+
+```bash
+env "511_API_KEY=$BAY_AREA_511_KEY" uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --refresh-transit "$HOME/otp-data/511-live"
+```
+
+Once the feeds are present, build and serve with the following commands in the first terminal.
+The directory mount makes atomic feed replacements visible to OTP. The build writes `graph.obj`
+to the host's `otp` directory. Both commands use paths inside the container for the JSON settings.
+
+```bash
+jar="$(realpath otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar)"
+otp_args=(--rm --entrypoint java
+  --mount "type=bind,source=$jar,target=/opt/otp.jar,readonly"
+  --mount "type=bind,source=$data,target=/data"
+  --env RG_STATIC_URI=file:///data/511-snapshot/RG.gtfs.zip
+  --env RG_RT_URI=file:///data/511-live)
+docker run "${otp_args[@]}" eclipse-temurin:25-jre -jar /opt/otp.jar --build --save /data/otp
+docker run "${otp_args[@]}" -p 127.0.0.1:8080:8080 eclipse-temurin:25-jre -jar /opt/otp.jar --load /data/otp
+```
+
+### Verify the service or replay a capture
+
+On either platform, POST `{"query":"{ feeds { feedId } }"}` as `application/json` to
+`http://127.0.0.1:8080/otp/gtfs/v1` and check that the response includes `RG`. For a fixed
+replay, point `RG_RT_URI` at the captured `511-snapshot` directory, set each updater frequency
+to `0s`, and plan for the time in `captured-at.txt`. A complete regional capture can be replayed
+offline. The replay report includes a trip query and the expected change of connection.
 [Bay Area replay results](Traffic511Replay.md)
+
+Rebuild the graph when adopting a new static timetable. This branch uses graph serialization
+version 293, so a graph built with version 292 also needs rebuilding.
 
 ## Add road conditions to street legs
 
@@ -94,6 +171,11 @@ limit applies separately to each successful dataset. An incomplete refresh retai
 complete dataset until it expires. A complete empty feed clears the source. Each request uses
 one consistent traffic snapshot. PeMS observations also expire at the traveler's traversal time.
 
+For example, when the Linux host exports `BAY_AREA_511_KEY`, set
+`"apiKeyEnvironmentVariable": "BAY_AREA_511_KEY"` on the `traffic-511` updater and add
+`--env BAY_AREA_511_KEY` to the serving container's Docker arguments. For regional transit alone
+the credential belongs to the download process.
+
 511's default allotment is 60 requests per hour per key, shared across consumers and endpoints.
 The road client allows 24 attempts per rolling hour per configured key variable in one process.
 The live transit command makes up to 32 additional requests per hour. Budget other deployments,
@@ -108,25 +190,34 @@ one-off captures and consumers sharing a token separately. PeMS uses its own pub
    Supply a new directory for each capture. The command saves the acquisition time, complete
    traffic datasets and all three regional GTFS-Realtime feeds.
 
-   ```shell
-   uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py /data/replays/bay-area-01
+   ```powershell
+   $env:RG_ROAD_CAPTURE = (Join-Path $data 'replays/bay-area-01').Replace('\', '/')
+   uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py $env:RG_ROAD_CAPTURE
+   $env:RG_RT_URI = ([uri]$env:RG_ROAD_CAPTURE).AbsoluteUri
+   ```
+
+   ```bash
+   env "511_API_KEY=$BAY_AREA_511_KEY" uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py "$data/replays/bay-area-01"
    ```
 
 3. Use the replay updater below in place of the two live traffic updaters. It reads the directory
    on startup and evaluates feed freshness as of capture. Plan trips for the date and time in
-   `captured-at.txt`. Point the standard transit updaters to the same capture.
+   `captured-at.txt`. Point the standard transit updaters to the same capture. For the container
+   example, set `--env RG_ROAD_CAPTURE=/data/replays/bay-area-01` and replace the `RG_RT_URI`
+   argument with `--env RG_RT_URI=file:///data/replays/bay-area-01`. The replay updater takes a
+   filesystem path. The GTFS-Realtime updaters take file URIs.
 
    ```json
    {
      "updaters": [
-       { "type": "traffic-511-replay", "directory": "/data/replays/bay-area-01" },
+       { "type": "traffic-511-replay", "directory": "${RG_ROAD_CAPTURE}" },
        { "type": "stop-time-updater", "feedId": "RG", "frequency": "0s",
          "reconcileStopSequence": true,
-         "url": "file:///data/replays/bay-area-01/tripupdates.pb" },
+         "url": "${RG_RT_URI}/tripupdates.pb" },
        { "type": "real-time-alerts", "feedId": "RG", "frequency": "0s",
-         "url": "file:///data/replays/bay-area-01/alerts.pb" },
+         "url": "${RG_RT_URI}/alerts.pb" },
        { "type": "vehicle-positions", "feedId": "RG", "frequency": "0s",
-         "url": "file:///data/replays/bay-area-01/vehiclepositions.pb" }
+         "url": "${RG_RT_URI}/vehiclepositions.pb" }
      ]
    }
    ```
@@ -279,6 +370,7 @@ offline evaluation. Live transit search continues to use agency predictions and 
 
 ## Contact and changes
 
-Report routing or configuration issues to the maintainer of the deployment's `traffic-511` branch.
-Include the source timestamp, travel mode and a reproducible trip request. November 2026 introduced
-the experimental graph metadata, street updaters and offline replay.
+The sandbox is maintained on the AC Transit fork's `traffic-511` branch. Include the source
+timestamp, travel mode and a reproducible trip request when reporting an issue to its maintainers.
+November 2026 introduced the experimental graph metadata, street updaters and offline replay.
+[AC Transit OpenTripPlanner fork](https://github.com/actransitorg/OpenTripPlanner/tree/traffic-511)

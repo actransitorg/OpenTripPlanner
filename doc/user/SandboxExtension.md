@@ -14,8 +14,8 @@
 
 ## Available extensions
 
-The [Bay Area road traffic](sandbox/Traffic511.md) sandbox combines road closures and freeway speeds
-with street routing.
+The [Bay Area regional transit and road traffic guide](sandbox/Traffic511.md) covers the RG feeds,
+road closures and freeway speeds, with setup instructions for Windows and Linux containers.
 
 ## Sandbox Goals
 
