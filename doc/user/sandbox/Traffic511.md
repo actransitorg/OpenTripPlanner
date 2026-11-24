@@ -7,52 +7,72 @@ reported closures and measured freeway speeds during street routing.
 
 ## Build and serve regional transit
 
-From the root of your fork checkout, select the branch with `git switch traffic-511`.
-With JDK 25 and Maven installed, build the shaded JAR in PowerShell or Bash:
+From the root of the fork checkout, select the branch with `git switch traffic-511`.
 
-```shell
-mvn -pl otp-shaded -am package -DskipTests -Dps
+### Build the sandbox image
+
+From Bash on a Linux Docker host, build the image used in the Linux example below.
+
+```bash
+bash script/traffic-511/build_publish.sh
 ```
 
-You can also build with Docker from PowerShell or Linux Bash. Mount the same checkout so
-the JAR stays on the host when the build container exits:
+The script builds the shaded JAR with JDK 25, bundles it in a Java 25 runtime image, and tags
+the image `otp-traffic-511:local`. To publish, log in to your registry and supply your own
+registry, repository and tag in place of the example.
 
-```shell
-docker run --rm --mount "type=bind,source=$PWD,target=/app/OpenTripPlanner" --workdir /app/OpenTripPlanner maven:3-eclipse-temurin-25 mvn -pl otp-shaded -am package -DskipTests -Dps
+```bash
+IMAGE=registry.example.org/transit/otp:traffic-511 bash script/traffic-511/build_publish.sh --publish
 ```
 
-The JAR is `otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar`. The `-Dps` flag skips the
-Spotless formatter and keeps Java Checkstyle enabled. If Spotless runs and cannot find npm on
-`PATH`, it reports `Can't automatically determine npm executable` once per file. Maven installs
-its own Node.js and npm for the debug client.
+### Build the JAR directly
 
-To check formatting as well, make Node.js and npm available on `PATH` and run
-`mvn -pl otp-shaded -am package -DskipTests -PprettierCheck`.
+The image build runs Spotless and Java Checkstyle. To run the same Maven build manually inside
+`maven:3-eclipse-temurin-25`, start in the repository root. The first two commands put the
+project's pinned Node.js and npm on `PATH` before Spotless starts. If Node 24 and npm are
+already on `PATH`, run just the final command.
 
-Use a data directory with the following layout on either platform:
+```bash
+mvn -f client/pom.xml frontend:install-node-and-npm@install-node-and-npm
+export PATH="$PWD/client/target/frontend/node:$PATH"
+mvn -pl otp-shaded -am package -DskipTests
+```
+
+For a native Windows build, use PowerShell with JDK 25 and Maven.
+
+```powershell
+mvn -f client/pom.xml frontend:install-node-and-npm@install-node-and-npm
+$env:Path = (Resolve-Path 'client/target/frontend/node').Path + [IO.Path]::PathSeparator + $env:Path
+mvn -pl otp-shaded -am package -DskipTests
+```
+
+The result is `otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar`. To run tests and check
+formatting as CI does, use `mvn test -PprettierCheck` in the same shell. If Spotless reports
+`Can't automatically determine npm executable`, check `npm --version` there. Running
+`mvn clean` removes the project-local toolchain, so run it before the setup commands.
+
+### Set up regional feeds
+
+Use one data directory and mount it at `/var/opentripplanner` in the container.
 
 ```text
-otp/           build-config.json, router-config.json, Bay Area .osm.pbf, and the resulting graph.obj
-511-snapshot/  RG.gtfs.zip, tripupdates.pb, alerts.pb, vehiclepositions.pb, captured-at.txt
-511-live/      tripupdates.pb, alerts.pb, vehiclepositions.pb refreshed by the download process
+bayarea/
+  build-config.json
+  router-config.json
+  bay-area.osm.pbf
+  511-snapshot/    RG.gtfs.zip, tripupdates.pb, alerts.pb, vehiclepositions.pb, captured-at.txt
+  511-live/        tripupdates.pb, alerts.pb, vehiclepositions.pb
+  graph.obj        created by --build --save
 ```
 
-The capture command creates `511-snapshot` and requests `operator_id=RG` for static GTFS and
-`agency=RG` for TripUpdates, ServiceAlerts and VehiclePositions. Use `RG` as the OTP feed ID
-for all four. Save the JSON below in the `otp` directory. OTP substitutes the two environment
-variables before parsing the files. The Windows and container instructions below set them to
-the paths visible to the Java process. To route around road closures, also enable the sandbox
-in `otp-config.json` before building the graph. [Road configuration](#add-road-conditions-to-street-legs) · [OTP configuration substitution](../Configuration.md#system-environment-and-project-information-substitution)
-
-**`build-config.json`**
-
-```json
-{
-  "transitFeeds": [
-    { "type": "gtfs", "feedId": "RG", "source": "${RG_STATIC_URI}" }
-  ]
-}
-```
+Copy the two starter files from `script/traffic-511/config/` when setting up a new data
+directory. Keep your edited copies for subsequent builds. They configure the regional
+timetable and realtime updaters with feed ID `RG`. The image sets `RG_STATIC_URI` to
+`file:///var/opentripplanner/511-snapshot/RG.gtfs.zip` and `RG_RT_URI` to
+`file:///var/opentripplanner/511-live`. The Windows example sets equivalent local paths.
+Capture requests use `operator_id=RG` for static GTFS and `agency=RG` for TripUpdates,
+ServiceAlerts and VehiclePositions. For road closures, also enable the sandbox in `otp-config.json`
+before building the graph. [Road configuration](#add-road-conditions-to-street-legs) · [OTP configuration substitution](../Configuration.md#system-environment-and-project-information-substitution)
 
 For live service, run the refresh command alongside OTP. It publishes each completed download
 atomically. TripUpdates refresh every three minutes and ServiceAlerts and VehiclePositions every
@@ -64,22 +84,6 @@ The optional stop-sequence reconciliation below checks explicit stop IDs against
 trip. It can recover one-based positions and out-of-order records when the evidence uniquely
 identifies each stop and supports its position on that trip.
 
-**`router-config.json`**
-
-```json
-{
-  "updaters": [
-    { "type": "stop-time-updater", "feedId": "RG", "frequency": "1m",
-      "reconcileStopSequence": true,
-      "url": "${RG_RT_URI}/tripupdates.pb" },
-    { "type": "real-time-alerts", "feedId": "RG", "frequency": "1m",
-      "url": "${RG_RT_URI}/alerts.pb" },
-    { "type": "vehicle-positions", "feedId": "RG", "frequency": "1m",
-      "url": "${RG_RT_URI}/vehiclepositions.pb" }
-  ]
-}
-```
-
 ### Windows PowerShell
 
 From the repository root, set `JAVA_HOME` to the installed JDK 25 directory. Set `511_API_KEY`
@@ -88,73 +92,77 @@ variable, open a new PowerShell window to pick it up. Install `uv` for the Pytho
 
 ```powershell
 $data = 'C:\otp-data'
-$otp = Join-Path $data 'otp'
 $java = Join-Path $env:JAVA_HOME 'bin\java.exe'
 $jar = (Resolve-Path 'otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar').Path
-& $java -version
-New-Item -ItemType Directory -Force $otp | Out-Null
+New-Item -ItemType Directory -Force $data | Out-Null
+Copy-Item script/traffic-511/config/*.json $data
 uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --regional-transit "$data\511-snapshot"
 $env:RG_STATIC_URI = ([uri](Join-Path $data '511-snapshot\RG.gtfs.zip')).AbsoluteUri
 $env:RG_RT_URI = ([uri](Join-Path $data '511-live')).AbsoluteUri
 ```
 
-Save the configuration and OSM extract in `$otp`. Start the following command in a second
+Place the Bay Area OSM extract directly in `$data`. Start the refresh command in a second
 PowerShell window from the repository root. Wait for the three realtime files to appear.
 
 ```powershell
 uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --refresh-transit 'C:\otp-data\511-live'
 ```
 
-Build and serve in the first window:
+Build the graph and serve it in the first window.
 
 ```powershell
-& $java -jar $jar --build --save $otp
-& $java -jar $jar --load --bindAddress 127.0.0.1 $otp
+& $java -jar $jar --build --save $data
+& $java -jar $jar --load --bindAddress 127.0.0.1 $data
 ```
 
 ### Linux container
 
-The example uses Bash on a Linux host, the branch JAR and a Temurin Java 25 Linux container.
-From the repository root, create a host data directory and place the configuration and OSM
-extract in its `otp` subdirectory. Run the capture helper on the host. If your secret manager
-supplies a shell variable named `BAY_AREA_511_KEY`, `env` passes it to the helper under the
-name `511_API_KEY`. If the process already inherits `511_API_KEY`, invoke `uv` directly.
+The following commands use the AC Transit host directory as a single bind mount. From the
+repository root on the Docker host, prepare the directory and place the Bay Area `.osm.pbf`
+beside the two JSON files. The capture helper reads `511_API_KEY` from its environment. If the
+host secret is named `BAY_AREA_511_KEY`, the `env` command below passes it under the required
+name. If the helper already inherits `511_API_KEY`, invoke `uv` directly.
 
 ```bash
-data="$HOME/otp-data"
-mkdir -p "$data/otp"
+data=/opt/actransit/opentripplanner2.10/docker/graphs/bayarea
+mkdir -p "$data"
+cp script/traffic-511/config/*.json "$data/"
 env "511_API_KEY=$BAY_AREA_511_KEY" uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --regional-transit "$data/511-snapshot"
 ```
 
-Run the live refresh in a separate terminal or service with the same host data directory:
+Start the live refresh from the repository root in a second terminal or service.
 
 ```bash
-env "511_API_KEY=$BAY_AREA_511_KEY" uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --refresh-transit "$HOME/otp-data/511-live"
+data=/opt/actransit/opentripplanner2.10/docker/graphs/bayarea
+env "511_API_KEY=$BAY_AREA_511_KEY" uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --refresh-transit "$data/511-live"
 ```
 
-Once the feeds are present, build and serve with the following commands in the first terminal.
-The directory mount makes atomic feed replacements visible to OTP. The build writes `graph.obj`
-to the host's `otp` directory. Both commands use paths inside the container for the JSON settings.
+In the first terminal, build the initial graph with the sandbox image. The mount makes both
+feed directories visible to OTP and writes `graph.obj` back to the host.
 
 ```bash
-jar="$(realpath otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar)"
-otp_args=(--rm --entrypoint java
-  --mount "type=bind,source=$jar,target=/opt/otp.jar,readonly"
-  --mount "type=bind,source=$data,target=/data"
-  --env RG_STATIC_URI=file:///data/511-snapshot/RG.gtfs.zip
-  --env RG_RT_URI=file:///data/511-live)
-docker run "${otp_args[@]}" eclipse-temurin:25-jre -jar /opt/otp.jar --build --save /data/otp
-docker run "${otp_args[@]}" -p 127.0.0.1:8080:8080 eclipse-temurin:25-jre -jar /opt/otp.jar --load /data/otp
+image=${IMAGE:-otp-traffic-511:local}
+docker run --rm -v "$data:/var/opentripplanner" "$image" --build --save
+```
+
+Once the graph and realtime files are present, start the service. This example uses the
+deployment's `middleware-network`, static IP, log rotation and `.env` file. The host serves
+OTP on port 9090. For a published image, set `IMAGE` to its full tag before the graph build.
+
+```bash
+docker run -d --name otp-traffic-511 --network middleware-network --ip 192.168.170.4 \
+  --restart=unless-stopped --log-opt max-size=10m --log-opt max-file=5 --env-file .env \
+  -p 9090:8080 -v "$data:/var/opentripplanner" "$image" --load --serve
 ```
 
 ### Verify the service or replay a capture
 
-On either platform, POST `{"query":"{ feeds { feedId } }"}` as `application/json` to
-`http://127.0.0.1:8080/otp/gtfs/v1` and check that the response includes `RG`. For a fixed
-replay, point `RG_RT_URI` at the captured `511-snapshot` directory, set each updater frequency
-to `0s`, and plan for the time in `captured-at.txt`. A complete regional capture can be replayed
-offline. The replay report includes a trip query and the expected change of connection.
-[Bay Area replay results](Traffic511Replay.md)
+POST `{"query":"{ feeds { feedId } }"}` as `application/json` to
+`http://127.0.0.1:9090/otp/gtfs/v1` for the container or
+`http://127.0.0.1:8080/otp/gtfs/v1` for native Windows. Check that the response includes
+`RG`. For a fixed replay, point `RG_RT_URI` at the captured `511-snapshot` directory, set
+each updater frequency to `0s`, and plan for the time in `captured-at.txt`. A complete
+regional capture can be replayed offline. [Bay Area replay results](Traffic511Replay.md)
 
 Rebuild the graph when adopting a new static timetable. This branch uses graph serialization
 version 293, so a graph built with version 292 also needs rebuilding.
@@ -220,8 +228,8 @@ one-off captures and consumers sharing a token separately. PeMS uses its own pub
 3. Use the replay updater below in place of the two live traffic updaters. It reads the directory
    on startup and evaluates feed freshness as of capture. Plan trips for the date and time in
    `captured-at.txt`. Point the standard transit updaters to the same capture. For the container
-   example, set `--env RG_ROAD_CAPTURE=/data/replays/bay-area-01` and replace the `RG_RT_URI`
-   argument with `--env RG_RT_URI=file:///data/replays/bay-area-01`. The replay updater takes a
+   example, add `--env RG_ROAD_CAPTURE=/var/opentripplanner/replays/bay-area-01` and
+   `--env RG_RT_URI=file:///var/opentripplanner/replays/bay-area-01`. The replay updater takes a
    filesystem path. The GTFS-Realtime updaters take file URIs.
 
    ```json

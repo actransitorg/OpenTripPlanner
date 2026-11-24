@@ -1,0 +1,6 @@
+FROM eclipse-temurin:25-jre
+COPY otp-shaded-2.11.0-SNAPSHOT.jar /opt/otp.jar
+ENV RG_STATIC_URI=file:///var/opentripplanner/511-snapshot/RG.gtfs.zip \
+    RG_RT_URI=file:///var/opentripplanner/511-live
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/opt/otp.jar", "/var/opentripplanner"]

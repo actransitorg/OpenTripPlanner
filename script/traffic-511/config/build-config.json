@@ -1,0 +1,9 @@
+{
+  "transitFeeds": [
+    {
+      "type": "gtfs",
+      "feedId": "RG",
+      "source": "${RG_STATIC_URI}"
+    }
+  ]
+}
