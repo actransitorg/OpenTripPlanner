@@ -7,12 +7,18 @@ reported closures and measured freeway speeds during street routing.
 
 ## Build and serve regional transit
 
-Use JDK 25 and Maven to build the shaded JAR. From the root of a fresh clone of the fork, run
-these commands in PowerShell or Bash:
+From the root of your fork checkout, select the branch with `git switch traffic-511`.
+With JDK 25 and Maven installed, build the shaded JAR in PowerShell or Bash:
 
 ```shell
-git switch traffic-511
 mvn -pl otp-shaded -am package -DskipTests -Dps
+```
+
+You can also build with Docker from PowerShell or Linux Bash. Mount the same checkout so
+the JAR stays on the host when the build container exits:
+
+```shell
+docker run --rm --mount "type=bind,source=$PWD,target=/app/OpenTripPlanner" --workdir /app/OpenTripPlanner maven:3-eclipse-temurin-25 mvn -pl otp-shaded -am package -DskipTests -Dps
 ```
 
 The JAR is `otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar`. The `-Dps` flag skips the
