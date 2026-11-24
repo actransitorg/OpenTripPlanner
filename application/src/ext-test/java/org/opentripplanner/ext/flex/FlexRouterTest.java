@@ -19,6 +19,7 @@ import org.opentripplanner.framework.application.OTPFeature;
 import org.opentripplanner.service.streetdetails.internal.DefaultStreetDetailsRepository;
 import org.opentripplanner.service.streetdetails.internal.DefaultStreetDetailsService;
 import org.opentripplanner.street.graph.Graph;
+import org.opentripplanner.street.search.request.StreetSearchRequest;
 import org.opentripplanner.transit.api.request.TripRequest;
 import org.opentripplanner.transit.model.TransitTestEnvironment;
 import org.opentripplanner.transit.model.TripInput;
@@ -139,7 +140,7 @@ class FlexRouterTest {
       new DefaultStreetDetailsService(new DefaultStreetDetailsRepository()),
       FlexParameters.defaultValues(),
       tripRequest,
-      requestedTime,
+      StreetSearchRequest.of().withStartTime(requestedTime).build(),
       null,
       0,
       2,

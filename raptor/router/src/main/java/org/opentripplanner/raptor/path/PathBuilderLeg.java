@@ -534,7 +534,9 @@ public class PathBuilderLeg<T extends RaptorTripSchedule> {
     } else {
       throw new IllegalStateException("Unexpected leg type before TransferLeg: " + this);
     }
-    setTime(newFromTime, newFromTime + asTransferLeg().transfer.durationInSeconds());
+    var transfer = asTransferLeg().transfer;
+    newFromTime = transfer.departureAfter(newFromTime);
+    setTime(newFromTime, transfer.arrivalAfter(newFromTime));
   }
 
   private void timeShiftEgressTime(RaptorSlackProvider slackProvider) {

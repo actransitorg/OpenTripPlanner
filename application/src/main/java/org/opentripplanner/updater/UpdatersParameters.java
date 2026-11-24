@@ -4,6 +4,9 @@ import java.util.List;
 import org.opentripplanner.ext.siri.updater.azure.SiriAzureETUpdaterParameters;
 import org.opentripplanner.ext.siri.updater.azure.SiriAzureSXUpdaterParameters;
 import org.opentripplanner.ext.siri.updater.mqtt.MqttSiriETUpdaterParameters;
+import org.opentripplanner.ext.traffic511.PemsParameters;
+import org.opentripplanner.ext.traffic511.Traffic511Parameters;
+import org.opentripplanner.ext.traffic511.TrafficReplay;
 import org.opentripplanner.ext.vehiclerentalservicedirectory.api.VehicleRentalServiceDirectoryFetcherParameters;
 import org.opentripplanner.framework.transaction.TimetableSnapshotParameters;
 import org.opentripplanner.updater.alert.gtfs.GtfsRealtimeAlertsUpdaterParameters;
@@ -19,6 +22,12 @@ import org.opentripplanner.updater.vehicle_position.VehiclePositionsUpdaterParam
 import org.opentripplanner.updater.vehicle_rental.VehicleRentalUpdaterParameters;
 
 public interface UpdatersParameters {
+  List<Traffic511Parameters> getTraffic511Parameters();
+
+  List<PemsParameters> getPemsParameters();
+
+  List<TrafficReplay.Parameters> getTrafficReplayParameters();
+
   TimetableSnapshotParameters timetableSnapshotParameters();
 
   VehicleRentalServiceDirectoryFetcherParameters getVehicleRentalServiceDirectoryFetcherParameters();

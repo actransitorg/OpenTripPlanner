@@ -8,6 +8,7 @@ import org.opentripplanner.model.plan.Emission;
 import org.opentripplanner.model.plan.Place;
 import org.opentripplanner.model.plan.walkstep.WalkStep;
 import org.opentripplanner.street.model.elevation.ElevationProfile;
+import org.opentripplanner.street.model.traffic.StreetTrafficNotice;
 import org.opentripplanner.street.search.TraverseMode;
 
 public class StreetLegBuilder {
@@ -22,6 +23,7 @@ public class StreetLegBuilder {
   private LineString geometry;
   private ElevationProfile elevationProfile;
   private List<WalkStep> walkSteps = List.of();
+  private List<StreetTrafficNotice> trafficNotices = List.of();
   private Boolean walkingBike;
   private Boolean rentedVehicle;
   private String vehicleRentalNetwork;
@@ -41,6 +43,7 @@ public class StreetLegBuilder {
     this.geometry = leg.legGeometry();
     this.elevationProfile = leg.elevationProfile();
     this.walkSteps = Objects.requireNonNull(leg.listWalkSteps());
+    this.trafficNotices = leg.streetTrafficNotices();
     this.walkingBike = leg.walkingBike();
     this.rentedVehicle = leg.rentedVehicle();
     this.vehicleRentalNetwork = leg.vehicleRentalNetwork();
@@ -90,6 +93,15 @@ public class StreetLegBuilder {
 
   public List<WalkStep> getWalkSteps() {
     return walkSteps;
+  }
+
+  List<StreetTrafficNotice> trafficNotices() {
+    return trafficNotices;
+  }
+
+  public StreetLegBuilder withTrafficNotices(List<StreetTrafficNotice> trafficNotices) {
+    this.trafficNotices = List.copyOf(trafficNotices);
+    return this;
   }
 
   public Boolean getWalkingBike() {

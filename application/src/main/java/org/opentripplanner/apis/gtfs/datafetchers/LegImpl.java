@@ -40,6 +40,7 @@ import org.opentripplanner.routing.alertpatch.TransitAlert;
 import org.opentripplanner.routing.alternativelegs.AlternativeLegs;
 import org.opentripplanner.routing.alternativelegs.AlternativeLegsFilter;
 import org.opentripplanner.routing.alternativelegs.NavigationDirection;
+import org.opentripplanner.street.model.traffic.StreetTrafficNotice;
 import org.opentripplanner.transit.model.network.Route;
 import org.opentripplanner.transit.model.organization.Agency;
 import org.opentripplanner.transit.model.timetable.Trip;
@@ -49,6 +50,11 @@ import org.opentripplanner.transit.service.TransitService;
 import org.opentripplanner.utils.collection.ListUtils;
 
 public class LegImpl implements GraphQLDataFetchers.GraphQLLeg {
+
+  @Override
+  public DataFetcher<Iterable<StreetTrafficNotice>> streetTrafficNotices() {
+    return environment -> getSource(environment).streetTrafficNotices();
+  }
 
   @Override
   public DataFetcher<Agency> agency() {

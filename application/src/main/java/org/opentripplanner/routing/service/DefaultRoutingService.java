@@ -35,6 +35,7 @@ import org.opentripplanner.routing.via.ViaCoordinateTransferFactory;
 import org.opentripplanner.service.streetdetails.StreetDetailsService;
 import org.opentripplanner.service.vehiclerental.VehicleRentalService;
 import org.opentripplanner.street.graph.Graph;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.street.service.StreetLimitationParametersService;
 import org.opentripplanner.transfer.regular.FlexTransferService;
 import org.opentripplanner.transit.service.TransitService;
@@ -157,7 +158,7 @@ public class DefaultRoutingService implements RoutingService {
     LOG.debug("Request: {}", request);
     OTPRequestTimeoutException.checkForTimeout();
     request.validateOriginAndDestination();
-    var worker = newRoutingWorker(mapRequest(request));
+    var worker = newRoutingWorker(mapRequest(request, graph.streetTrafficSnapshot()));
     var response = worker.route();
     logResponse(response);
     return response;
@@ -167,8 +168,9 @@ public class DefaultRoutingService implements RoutingService {
   public ViaRoutingResponse route(RouteViaRequest request) {
     LOG.debug("Request: {}", request);
     OTPRequestTimeoutException.checkForTimeout();
+    var streetTraffic = graph.streetTrafficSnapshot();
     var viaRoutingWorker = new ViaRoutingWorker(request, req ->
-      newRoutingWorker(mapRequest(req)).route()
+      newRoutingWorker(mapRequest(req, streetTraffic)).route()
     );
     // TODO: Add output logging here, see route(..) method
     return viaRoutingWorker.route();
@@ -203,8 +205,12 @@ public class DefaultRoutingService implements RoutingService {
     );
   }
 
-  private RoutingWorkerRequest mapRequest(RouteRequest request) {
-    return requestPreProcessor.computeRequest(request);
+  private RoutingWorkerRequest mapRequest(RouteRequest request, StreetTrafficSnapshot traffic) {
+    var pinned =
+      traffic == StreetTrafficSnapshot.NONE
+        ? request
+        : request.copyOf().withStreetTraffic(traffic).buildRequest();
+    return requestPreProcessor.computeRequest(pinned);
   }
 
   private void logResponse(RoutingResponse response) {

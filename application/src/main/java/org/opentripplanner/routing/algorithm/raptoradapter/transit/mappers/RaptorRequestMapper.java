@@ -28,6 +28,7 @@ import org.opentripplanner.raptor.spi.RaptorConstants;
 import org.opentripplanner.raptor.spi.RaptorCostConverter;
 import org.opentripplanner.raptor.spi.RaptorTripSchedule;
 import org.opentripplanner.routing.algorithm.raptoradapter.router.performance.PerformanceTimersForRaptor;
+import org.opentripplanner.routing.algorithm.raptoradapter.transit.request.TrafficAwareViaTransfer;
 import org.opentripplanner.routing.api.request.DebugEventType;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.routing.api.request.preference.TransitPreferences;
@@ -35,6 +36,7 @@ import org.opentripplanner.routing.api.request.via.ViaLocation;
 import org.opentripplanner.routing.api.request.via.VisitViaLocation;
 import org.opentripplanner.routing.linking.LinkingContext;
 import org.opentripplanner.routing.via.ViaCoordinateTransferFactory;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.transit.model.network.grouppriority.DefaultTransitGroupPriorityCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,8 +232,12 @@ public class RaptorRequestMapper<T extends RaptorTripSchedule> {
           );
         }
         for (var vertex : vertices) {
+          var candidateRequest =
+            request.streetTraffic() == StreetTrafficSnapshot.NONE
+              ? request
+              : request.copyOf().withStreetTraffic(StreetTrafficSnapshot.NONE).buildRequest();
           var viaTransfers = viaTransferResolver.createViaTransfers(
-            request,
+            candidateRequest,
             vertex,
             input.coordinate().get()
           );
@@ -242,7 +248,15 @@ public class RaptorRequestMapper<T extends RaptorTripSchedule> {
             if (it.stop() == it.fromStopIndex() && viaStops.contains(it.stop())) {
               continue;
             }
-            builder.addTransfer(it.fromStopIndex(), it);
+            builder.addTransfer(
+              it.fromStopIndex(),
+              TrafficAwareViaTransfer.of(
+                request,
+                it,
+                Instant.ofEpochSecond(transitSearchTimeZeroEpocSecond),
+                input.minimumWaitTime()
+              )
+            );
           }
         }
       }

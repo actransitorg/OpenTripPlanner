@@ -74,6 +74,7 @@ config:
     Itinerary: org.opentripplanner.model.plan.Itinerary#Itinerary
     Leg: org.opentripplanner.model.plan.Leg#Leg
     LegTime: org.opentripplanner.model.plan.leg.LegCallTime#LegCallTime
+    StreetTrafficNotice: org.opentripplanner.street.model.traffic.StreetTrafficNotice#StreetTrafficNotice
     Level: org.opentripplanner.service.streetdetails.model.Level#Level
     Mode: String
     OccupancyStatus: org.opentripplanner.apis.gtfs.generated.GraphQLTypes.GraphQLOccupancyStatus#GraphQLOccupancyStatus

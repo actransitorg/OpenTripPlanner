@@ -221,12 +221,14 @@ public final class McRangeRaptorWorkerState<T extends RaptorTripSchedule> implem
 
   private void transferToStop(
     Iterable<? extends McStopArrival<T>> fromArrivals,
-    RaptorTransfer transfer
+    RaptorTransfer candidate
   ) {
-    final int transferTimeInSeconds = transfer.durationInSeconds();
-
     for (McStopArrival<T> it : fromArrivals) {
-      int arrivalTime = it.arrivalTime() + transferTimeInSeconds;
+      var transfer = candidate.atTime(it.arrivalTime());
+      if (transfer == null) {
+        continue;
+      }
+      int arrivalTime = it.arrivalTime() + transfer.durationInSeconds();
 
       if (!exceedsTimeLimit(arrivalTime)) {
         var arrival = stopArrivalFactory.createTransferStopArrival(it, transfer, arrivalTime);

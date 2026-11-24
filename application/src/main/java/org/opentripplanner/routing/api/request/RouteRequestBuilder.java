@@ -16,6 +16,7 @@ import org.opentripplanner.routing.api.request.preference.RoutingPreferencesBuil
 import org.opentripplanner.routing.api.request.request.JourneyRequest;
 import org.opentripplanner.routing.api.request.request.JourneyRequestBuilder;
 import org.opentripplanner.routing.api.request.via.ViaLocation;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.utils.time.DateUtils;
 
 /**
@@ -42,6 +43,7 @@ public class RouteRequestBuilder implements Serializable {
   RoutingPreferences preferences;
   int numItineraries;
   boolean defaultRequest;
+  transient StreetTrafficSnapshot streetTraffic;
 
   private final RouteRequest original;
 
@@ -61,6 +63,7 @@ public class RouteRequestBuilder implements Serializable {
     this.preferences = original.preferences();
     this.numItineraries = original.numItineraries();
     this.defaultRequest = original.isDefaultRequest();
+    this.streetTraffic = original.streetTraffic();
   }
 
   public RouteRequestBuilder withJourney(JourneyRequest journey) {
@@ -80,6 +83,11 @@ public class RouteRequestBuilder implements Serializable {
 
   public RouteRequestBuilder withPreferences(RoutingPreferences preferences) {
     this.preferences = preferences;
+    return this;
+  }
+
+  public RouteRequestBuilder withStreetTraffic(StreetTrafficSnapshot snapshot) {
+    this.streetTraffic = snapshot;
     return this;
   }
 

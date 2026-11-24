@@ -198,17 +198,27 @@ public final class StdRangeRaptorWorkerState<T extends RaptorTripSchedule> imple
    *         duration, so if a transfer exceeds the time limit or the early pruning bound, so will
    *         all later transfers also exceed the time limit or the early pruning bound.
    */
-  private boolean transferToStop(int arrivalTimeTransit, int fromStop, RaptorTransfer transfer) {
-    final int arrivalTime = calculator.plusDuration(
+  private boolean transferToStop(int arrivalTimeTransit, int fromStop, RaptorTransfer candidate) {
+    int earliest = calculator.plusDuration(
       arrivalTimeTransit,
-      transfer.durationInSeconds()
+      candidate.minimumDurationInSeconds()
     );
-
-    if (exceedsTimeLimit(arrivalTime)) {
+    if (
+      exceedsTimeLimit(earliest) || (earlyPruning != null && earlyPruning.exceedsBound(earliest))
+    ) {
       return true;
     }
-    if (earlyPruning != null && earlyPruning.exceedsBound(arrivalTime)) {
-      return true;
+    var transfer = candidate.atTime(arrivalTimeTransit);
+    if (transfer == null) {
+      return false;
+    }
+    int arrivalTime = calculator.plusDuration(arrivalTimeTransit, transfer.durationInSeconds());
+    if (
+      arrivalTime != earliest &&
+      (exceedsTimeLimit(arrivalTime) ||
+        (earlyPruning != null && earlyPruning.exceedsBound(arrivalTime)))
+    ) {
+      return false;
     }
 
     final int toStop = transfer.stop();

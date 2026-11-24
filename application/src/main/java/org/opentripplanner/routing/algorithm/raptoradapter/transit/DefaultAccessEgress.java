@@ -31,6 +31,7 @@ public class DefaultAccessEgress implements RoutingAccessEgress {
   private final TimeAndCost penalty;
 
   private final State finalState;
+  private final StreetPathAvailability availability;
 
   /**
    * This is public to allow unit-tests full control over the field values.
@@ -42,21 +43,45 @@ public class DefaultAccessEgress implements RoutingAccessEgress {
     TimeAndCost penalty,
     State finalState
   ) {
+    this(
+      stop,
+      durationInSeconds,
+      generalizedCost,
+      penalty,
+      finalState,
+      StreetPathAvailability.ALWAYS
+    );
+  }
+
+  private DefaultAccessEgress(
+    int stop,
+    int durationInSeconds,
+    int generalizedCost,
+    TimeAndCost penalty,
+    State finalState,
+    StreetPathAvailability availability
+  ) {
     this.stop = stop;
     this.durationInSeconds = durationInSeconds;
     this.generalizedCost = generalizedCost;
     this.timePenalty = penalty.isZero() ? RaptorConstants.TIME_NOT_SET : penalty.timeInSeconds();
     this.penalty = penalty;
     this.finalState = Objects.requireNonNull(finalState);
+    this.availability = availability;
   }
 
   public DefaultAccessEgress(int stop, State finalState) {
+    this(stop, finalState, StreetPathAvailability.ALWAYS);
+  }
+
+  public DefaultAccessEgress(int stop, State finalState, StreetPathAvailability availability) {
     this(
       stop,
       (int) finalState.getElapsedTimeSeconds(),
       CostLimit.toRaptorCost(finalState.getWeight()),
       TimeAndCost.ZERO,
-      finalState
+      finalState,
+      availability
     );
   }
 
@@ -65,7 +90,7 @@ public class DefaultAccessEgress implements RoutingAccessEgress {
    * cost are derived from the street search again, so any penalty of {@code other} is dropped.
    */
   protected DefaultAccessEgress(DefaultAccessEgress other) {
-    this(other.stop, other.finalState);
+    this(other.stop, other.finalState, other.availability);
   }
 
   protected DefaultAccessEgress(DefaultAccessEgress other, TimeAndCost penalty) {
@@ -77,7 +102,8 @@ public class DefaultAccessEgress implements RoutingAccessEgress {
       other.durationInSeconds(),
       other.c1() + penalty.cost().toCentiSeconds(),
       penalty,
-      other.finalState
+      other.finalState,
+      other.availability
     );
     if (other.penalty() != TimeAndCost.ZERO) {
       throw new IllegalStateException("Can not add penalty twice...");
@@ -106,7 +132,7 @@ public class DefaultAccessEgress implements RoutingAccessEgress {
 
   @Override
   public boolean hasOpeningHours() {
-    return false;
+    return availability != StreetPathAvailability.ALWAYS;
   }
 
   /**
@@ -151,12 +177,12 @@ public class DefaultAccessEgress implements RoutingAccessEgress {
 
   @Override
   public int earliestDepartureTime(int requestedDepartureTime) {
-    return requestedDepartureTime;
+    return availability.earliestDeparture(requestedDepartureTime);
   }
 
   @Override
   public int latestArrivalTime(int requestedArrivalTime) {
-    return requestedArrivalTime;
+    return availability.latestArrival(requestedArrivalTime, durationInSeconds);
   }
 
   @Override
@@ -174,6 +200,13 @@ public class DefaultAccessEgress implements RoutingAccessEgress {
     if (!(o instanceof RoutingAccessEgress that)) {
       return false;
     }
+    var thatAvailability =
+      that instanceof DefaultAccessEgress other
+        ? other.availability
+        : StreetPathAvailability.ALWAYS;
+    if (!availability.equals(thatAvailability)) {
+      return false;
+    }
     return (
       stop() == that.stop() &&
       durationInSeconds() == that.durationInSeconds() &&
@@ -184,7 +217,10 @@ public class DefaultAccessEgress implements RoutingAccessEgress {
 
   @Override
   public int hashCode() {
-    return Objects.hash(stop, durationInSeconds, generalizedCost, penalty);
+    int hash = Objects.hash(stop, durationInSeconds, generalizedCost, penalty);
+    return availability == StreetPathAvailability.ALWAYS
+      ? hash
+      : 31 * hash + availability.hashCode();
   }
 
   /**

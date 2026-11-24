@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import org.locationtech.jts.geom.LineString;
@@ -14,6 +15,8 @@ import org.opentripplanner.street.geometry.GeometryUtils;
 import org.opentripplanner.street.model.edge.Edge;
 import org.opentripplanner.street.model.edge.StreetEdge;
 import org.opentripplanner.street.model.elevation.ElevationProfile;
+import org.opentripplanner.street.model.traffic.StreetTrafficNotice;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.street.search.state.State;
 
 /// This class represents a path within the street network
@@ -21,11 +24,17 @@ public class StreetPath {
 
   private final List<State> states;
   private final List<Edge> edges;
+  private final List<State> reverseTraversals;
 
   public StreetPath(List<State> states, List<Edge> edges) {
+    this(states, edges, List.of());
+  }
+
+  private StreetPath(List<State> states, List<Edge> edges, List<State> reverseTraversals) {
     validate(states, edges);
     this.states = states;
     this.edges = edges;
+    this.reverseTraversals = reverseTraversals;
   }
 
   /**
@@ -51,6 +60,24 @@ public class StreetPath {
     validate(states, edges);
     this.states = states;
     this.edges = edges;
+    if (
+      finalState.getRequest().arriveBy() &&
+      finalState.getRequest().streetTraffic() != StreetTrafficSnapshot.NONE
+    ) {
+      // Reversing a path copies total transition times. The original states retain which turn
+      // was charged on each edge and the exact interval spent moving on the road.
+      var transitions = new ArrayList<State>(edges.size());
+      for (
+        var completed = finalState;
+        completed.getBackState() != null;
+        completed = completed.getBackState()
+      ) {
+        transitions.add(completed);
+      }
+      this.reverseTraversals = transitions;
+    } else {
+      this.reverseTraversals = List.of();
+    }
   }
 
   private static void validate(List<State> states, List<Edge> edges) {
@@ -103,6 +130,31 @@ public class StreetPath {
   /// Get the last state in the path
   public State lastState() {
     return states.getLast();
+  }
+
+  /** Source reports on traveled street sections at the time this path appears in the itinerary. */
+  public List<StreetTrafficNotice> trafficNotices(long timeShiftMillis) {
+    var traffic = states.getFirst().getRequest().streetTraffic();
+    if (traffic == StreetTrafficSnapshot.NONE) {
+      return List.of();
+    }
+    var notices = new LinkedHashSet<StreetTrafficNotice>();
+    for (int i = 0; i < edges.size(); i++) {
+      var state = reverseTraversals.isEmpty() ? states.get(i + 1) : reverseTraversals.get(i);
+      var mode = state.getBackMode();
+      if (mode != null && edges.get(i) instanceof StreetEdge edge) {
+        var occupied = edge.trafficOccupancy(state);
+        notices.addAll(
+          traffic.notices(
+            edge,
+            mode,
+            occupied.startMillis() + timeShiftMillis,
+            occupied.endMillis() + timeShiftMillis
+          )
+        );
+      }
+    }
+    return List.copyOf(notices);
   }
 
   public ElevationProfile elevation(boolean geoidElevation, double ellipsoidToGeoidDifference) {
@@ -160,6 +212,9 @@ public class StreetPath {
   public StreetPath subPath(int startIdx, int endIdx) {
     var subStates = states.subList(startIdx, endIdx);
     var subEdges = edges.subList(startIdx, endIdx - 1);
-    return new StreetPath(subStates, subEdges);
+    var traversals = reverseTraversals.isEmpty()
+      ? reverseTraversals
+      : reverseTraversals.subList(startIdx, endIdx - 1);
+    return new StreetPath(subStates, subEdges, traversals);
   }
 }

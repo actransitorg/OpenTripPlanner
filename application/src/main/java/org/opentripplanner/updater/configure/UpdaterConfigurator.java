@@ -13,6 +13,7 @@ import org.opentripplanner.ext.carpooling.routing.RoutableCarpoolTripResolver;
 import org.opentripplanner.ext.carpooling.updater.SiriETCarpoolingUpdater;
 import org.opentripplanner.ext.siri.updater.azure.SiriAzureUpdater;
 import org.opentripplanner.ext.siri.updater.mqtt.SiriETMqttUpdater;
+import org.opentripplanner.ext.traffic511.TrafficUpdaters;
 import org.opentripplanner.ext.vehiclerentalservicedirectory.VehicleRentalServiceDirectoryFetcher;
 import org.opentripplanner.ext.vehiclerentalservicedirectory.api.VehicleRentalServiceDirectoryFetcherParameters;
 import org.opentripplanner.framework.application.OTPFeature;
@@ -187,6 +188,17 @@ public class UpdaterConfigurator {
 
   private void configure() {
     List<GraphUpdater<?>> updaters = new ArrayList<>();
+
+    if (OTPFeature.Traffic511.isOn()) {
+      updaters.addAll(
+        TrafficUpdaters.create(
+          graph,
+          updatersParameters.getTraffic511Parameters(),
+          updatersParameters.getPemsParameters(),
+          updatersParameters.getTrafficReplayParameters()
+        )
+      );
+    }
 
     updaters.addAll(createUpdatersFromConfig());
 

@@ -14,6 +14,7 @@ import org.opentripplanner.model.plan.Place;
 import org.opentripplanner.model.plan.walkstep.WalkStep;
 import org.opentripplanner.routing.alertpatch.TransitAlert;
 import org.opentripplanner.street.model.elevation.ElevationProfile;
+import org.opentripplanner.street.model.traffic.StreetTrafficNotice;
 import org.opentripplanner.street.search.TraverseMode;
 import org.opentripplanner.utils.lang.DoubleUtils;
 import org.opentripplanner.utils.time.TimeUtils;
@@ -34,6 +35,7 @@ public class StreetLeg implements Leg {
   private final int generalizedCost;
   private final LineString legGeometry;
   private final List<WalkStep> walkSteps;
+  private final List<StreetTrafficNotice> trafficNotices;
   private final ElevationProfile elevationProfile;
 
   private final Boolean walkingBike;
@@ -53,6 +55,7 @@ public class StreetLeg implements Leg {
     this.elevationProfile = builder.getElevationProfile();
     this.legGeometry = builder.getGeometry();
     this.walkSteps = Objects.requireNonNull(builder.getWalkSteps());
+    this.trafficNotices = builder.trafficNotices();
     this.walkingBike = builder.getWalkingBike();
     this.rentedVehicle = builder.getRentedVehicle();
     this.vehicleRentalNetwork = builder.getVehicleRentalNetwork();
@@ -133,6 +136,11 @@ public class StreetLeg implements Leg {
   @Override
   public Set<TransitAlert> listTransitAlerts() {
     return Set.of();
+  }
+
+  @Override
+  public List<StreetTrafficNotice> streetTrafficNotices() {
+    return trafficNotices;
   }
 
   @Override

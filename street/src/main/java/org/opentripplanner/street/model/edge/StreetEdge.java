@@ -5,6 +5,7 @@ import java.io.ObjectOutputStream;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.impl.PackedCoordinateSequence;
 import org.opentripplanner.core.model.accessibility.Accessibility;
@@ -16,7 +17,9 @@ import org.opentripplanner.street.geometry.EndpointContextLineString;
 import org.opentripplanner.street.geometry.GeometryUtils;
 import org.opentripplanner.street.geometry.SplitLineString;
 import org.opentripplanner.street.linking.LinkingDirection;
+import org.opentripplanner.street.model.OsmWayIdentity;
 import org.opentripplanner.street.model.StreetTraversalPermission;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.street.model.vertex.BarrierPassThroughVertex;
 import org.opentripplanner.street.model.vertex.BarrierVertex;
 import org.opentripplanner.street.model.vertex.IntersectionVertex;
@@ -76,6 +79,7 @@ public class StreetEdge
   static final int WHEELCHAIR_INACCESSIBLE_BARRIER_FLAG_INDEX = 11;
 
   private StreetEdgeCostExtension costExtension;
+  private final @Nullable OsmWayIdentity wayIdentity;
 
   /** back, roundabout, stairs, ... */
   private short flags;
@@ -126,6 +130,7 @@ public class StreetEdge
 
   protected StreetEdge(StreetEdgeBuilder<?> builder) {
     super(builder.fromVertex(), builder.toVertex());
+    this.wayIdentity = builder.wayIdentity();
     this.flags = BitSetUtils.set(
       builder.getFlags(),
       WHEELCHAIR_INACCESSIBLE_BARRIER_FLAG_INDEX,
@@ -452,6 +457,11 @@ public class StreetEdge
     return length_mm / 1000.0;
   }
 
+  /** The original directed street edge, or this edge when it is a permanent street segment. */
+  public StreetEdge getParentEdge() {
+    return this;
+  }
+
   @Override
   public double getEffectiveWalkDistance() {
     return hasElevationExtension()
@@ -570,6 +580,10 @@ public class StreetEdge
 
   public void setCostExtension(StreetEdgeCostExtension costExtension) {
     this.costExtension = costExtension;
+  }
+
+  public @Nullable OsmWayIdentity getWayIdentity() {
+    return wayIdentity;
   }
 
   /**
@@ -733,6 +747,7 @@ public class StreetEdge
     double toDistance
   ) {
     seb.withFlags(flags);
+    seb.withWayIdentity(wayIdentity);
     seb.withBicycleSafetyFactor(bicycleSafetyFactor);
     seb.withWalkSafetyFactor(walkSafetyFactor);
     seb.withCarSpeed(carSpeed);
@@ -836,28 +851,66 @@ public class StreetEdge
       s1.updateGeofencingZones(fromv, tov, s0.getRequest().arriveBy());
     }
 
+    var traffic = s0.getRequest().streetTraffic();
+    var occupancy = traverseMovement(s0, s1, traverseMode, walkingBike, false);
+    if (
+      occupancy != null &&
+      traffic.isClosed(this, traverseMode, occupancy.startMillis(), occupancy.endMillis())
+    ) {
+      if (
+        traverseMode == TraverseMode.BICYCLE &&
+        canTraverse(TraverseMode.WALK) &&
+        canSwitchToWalkingBike(s0)
+      ) {
+        return doTraverse(s0, TraverseMode.WALK, true);
+      }
+      if (
+        traverseMode == TraverseMode.CAR &&
+        canDropOffAfterDriving(s0) &&
+        canTraverse(TraverseMode.WALK)
+      ) {
+        var dropOff = doTraverse(s0, TraverseMode.WALK, false);
+        if (dropOff != null) {
+          dropOffAfterDriving(s0, dropOff);
+        }
+        return dropOff;
+      }
+      return null;
+    }
+    s1.incrementTraversalDistanceMeters(getDistanceWithElevation());
+    return s1;
+  }
+
+  /** The part of this transition spent moving along the road, excluding turns and mode changes. */
+  public record Occupancy(long startMillis, long endMillis) {}
+
+  /** Reconstruct the edge occupancy of a traffic-aware path in the original search direction. */
+  public Occupancy trafficOccupancy(State completed) {
+    var before = completed.getBackState();
+    var mode = completed.getBackMode();
+    boolean walkingBike =
+      mode == TraverseMode.WALK && completed.isBackWalkingBike() && canSwitchToWalkingBike(before);
+    var editor = createEditor(before, this, mode, walkingBike);
+    return Objects.requireNonNull(traverseMovement(before, editor, mode, walkingBike, true));
+  }
+
+  private Occupancy traverseMovement(
+    State s0,
+    StateEditor s1,
+    TraverseMode traverseMode,
+    boolean walkingBike,
+    boolean captureOccupancy
+  ) {
     var request = s0.getRequest();
 
     // Automobiles have variable speeds depending on the edge type
     double speed = calculateSpeed(request, traverseMode, walkingBike);
 
-    var traversalCosts = switch (traverseMode) {
-      case BICYCLE, SCOOTER -> bicycleOrScooterTraversalCost(request, traverseMode, speed, s0);
-      case WALK -> walkingTraversalCosts(
-        request,
-        traverseMode,
-        speed,
-        walkingBike,
-        s0.getRequest().wheelchairEnabled()
-      );
-      default -> otherTraversalCosts(request, traverseMode, walkingBike, speed);
-    };
-
-    long time_ms = (long) Math.ceil(1000.0 * traversalCosts.time());
-    var weight = traversalCosts.weight();
+    long turnMillis = 0;
+    double turnWeight = 0;
 
     /* Compute turn cost. */
-    if (backEdge instanceof StreetEdge backPSE) {
+    if (s0.getBackEdge() instanceof StreetEdge backPSE) {
       TraverseMode backMode = s0.getBackMode();
       final boolean arriveBy = s0.getRequest().arriveBy();
 
@@ -917,21 +970,50 @@ public class StreetEdge
         case CAR -> request.car().reluctance();
         case FLEX -> 1;
       };
-      time_ms += (long) Math.ceil(1000.0 * turnDuration);
-      weight += modeReluctance * request.turnReluctance() * turnDuration;
+      turnMillis = (long) Math.ceil(1000.0 * turnDuration);
+      turnWeight = modeReluctance * request.turnReluctance() * turnDuration;
     }
 
-    s1.incrementTraversalDistanceMeters(getDistanceWithElevation());
-
-    if (costExtension != null) {
-      weight += costExtension.calculateExtraCost(s0, length_mm, traverseMode);
+    // The intersection model uses the underlying street design speeds. Its turn takes place
+    // before occupying this edge in a forward search and after it in a backward search.
+    s1.incrementTimeInMilliseconds(turnMillis);
+    var traffic = request.streetTraffic();
+    long boundary = s1.getTimeMilliseconds();
+    boolean trafficApplies =
+      traffic != StreetTrafficSnapshot.NONE && traffic.mayAffectTraversal(this);
+    if (trafficApplies && traverseMode == TraverseMode.CAR) {
+      double observed = traffic.carSpeed(this, boundary, request.arriveBy(), speed);
+      if (Double.isFinite(observed) && observed > 0) {
+        speed = Math.min(speed, observed);
+      }
     }
 
-    s1.incrementTimeInMilliseconds(time_ms);
-
-    s1.incrementWeight(weight);
-
-    return s1;
+    var traversalCosts = switch (traverseMode) {
+      case BICYCLE, SCOOTER -> bicycleOrScooterTraversalCost(request, traverseMode, speed, s0);
+      case WALK -> walkingTraversalCosts(
+        request,
+        traverseMode,
+        speed,
+        walkingBike,
+        request.wheelchairEnabled()
+      );
+      default -> otherTraversalCosts(request, traverseMode, walkingBike, speed);
+    };
+    long movementMillis = (long) Math.ceil(1000.0 * traversalCosts.time());
+    s1.incrementTimeInMilliseconds(movementMillis);
+    if (!captureOccupancy) {
+      var weight = traversalCosts.weight() + turnWeight;
+      if (costExtension != null) {
+        weight += costExtension.calculateExtraCost(s0, length_mm, traverseMode);
+      }
+      s1.incrementWeight(weight);
+    }
+    if (!trafficApplies && !captureOccupancy) {
+      return null;
+    }
+    return request.arriveBy()
+      ? new Occupancy(s1.getTimeMilliseconds(), boundary)
+      : new Occupancy(boundary, s1.getTimeMilliseconds());
   }
 
   private TraversalCosts otherTraversalCosts(

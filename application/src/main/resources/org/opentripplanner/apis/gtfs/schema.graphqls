@@ -1082,6 +1082,8 @@ type Leg {
   Non-transit legs return an empty list.
   """
   stopCalls: [StopCall!]!
+  "Experimental traffic reports and speed observations on the street sections traveled in this leg."
+  streetTrafficNotices: [StreetTrafficNotice!]!
   "The Place where the leg ends."
   to: Place!
   "Whether this leg is a transit leg or not."
@@ -2946,6 +2948,20 @@ type Stoptime {
 type StoptimesInPattern {
   pattern: Pattern
   stoptimes: [Stoptime]
+}
+
+"A source report that applies to a traveled street section."
+type StreetTrafficNotice {
+  "How the source report applies, for example ADVISORY, REPORTED_DELAY or MEASURED_SPEED."
+  basis: String!
+  "Time the source published or observed the condition, when available."
+  reportedAt: OffsetDateTime
+  "Publishing data source."
+  source: String!
+  "Event or detector identifier in the source feed."
+  sourceId: String!
+  "Description of the condition."
+  summary: String!
 }
 
 """

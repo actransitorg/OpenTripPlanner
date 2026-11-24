@@ -25,12 +25,12 @@ public final class RideHailingAccessAdapter extends DefaultAccessEgress {
 
   @Override
   public int earliestDepartureTime(int requestedDepartureTime) {
-    return super.earliestDepartureTime(requestedDepartureTime) + (int) arrival.toSeconds();
+    return super.earliestDepartureTime(requestedDepartureTime + (int) arrival.toSeconds());
   }
 
   @Override
   public int latestArrivalTime(int requestedArrivalTime) {
-    return super.latestArrivalTime(requestedArrivalTime) + (int) arrival.toSeconds();
+    return super.latestArrivalTime(requestedArrivalTime + (int) arrival.toSeconds());
   }
 
   @Override

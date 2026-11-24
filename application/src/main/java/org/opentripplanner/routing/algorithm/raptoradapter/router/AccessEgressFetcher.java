@@ -9,6 +9,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import org.opentripplanner.ext.carpooling.CarpoolingService;
 import org.opentripplanner.ext.dataoverlay.configuration.DataOverlayParameterBindings;
@@ -18,6 +19,7 @@ import org.opentripplanner.ext.ridehailing.RideHailingAccessShifter;
 import org.opentripplanner.ext.ridehailing.RideHailingService;
 import org.opentripplanner.ext.taxi.TaxiService;
 import org.opentripplanner.framework.application.OTPFeature;
+import org.opentripplanner.place.api.NearbyStop;
 import org.opentripplanner.routing.algorithm.raptoradapter.router.startonboardaccess.RoutingStartOnBoardAccess;
 import org.opentripplanner.routing.algorithm.raptoradapter.router.startonboardaccess.TripAndServiceDateResolver;
 import org.opentripplanner.routing.algorithm.raptoradapter.router.startonboardaccess.TripLocationResolver;
@@ -25,7 +27,9 @@ import org.opentripplanner.routing.algorithm.raptoradapter.router.startonboardac
 import org.opentripplanner.routing.algorithm.raptoradapter.router.street.AccessEgressRouter;
 import org.opentripplanner.routing.algorithm.raptoradapter.router.street.AccessEgressType;
 import org.opentripplanner.routing.algorithm.raptoradapter.router.street.FlexAccessEgressRouter;
+import org.opentripplanner.routing.algorithm.raptoradapter.router.street.TrafficAccessEgressRouter;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RoutingAccessEgress;
+import org.opentripplanner.routing.algorithm.raptoradapter.transit.StreetPathAvailability;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.mappers.AccessEgressMapper;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.request.RaptorRoutingRequestTransitData;
 import org.opentripplanner.routing.api.request.RouteRequest;
@@ -34,6 +38,7 @@ import org.opentripplanner.routing.linking.LinkingContext;
 import org.opentripplanner.service.streetdetails.StreetDetailsService;
 import org.opentripplanner.street.graph.Graph;
 import org.opentripplanner.street.model.StreetMode;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.transfer.regular.FlexTransferService;
 import org.opentripplanner.transit.service.TransitService;
 import org.opentripplanner.transit.service.TransitServiceResolver;
@@ -188,19 +193,35 @@ class AccessEgressFetcher {
       accessRequest.preferences().system().dataOverlay(),
       dataOverlayParameterBindings
     );
-    var nearbyStops = AccessEgressRouter.findAccessEgresses(
-      accessRequest,
-      mode,
-      dataOverlayContext,
-      type,
-      durationLimit,
-      stopCountLimit,
-      linkingContext
-    );
-    if (taxiService != null && mode == StreetMode.TAXI) {
-      nearbyStops = taxiService.filterNearbyStops(transitService, nearbyStops, type, request);
-    }
-    var accessEgresses = accessEgressMapper.mapNearbyStops(nearbyStops);
+    Function<RouteRequest, Collection<NearbyStop>> findStops = variant -> {
+      var nearbyStops = AccessEgressRouter.findAccessEgresses(
+        variant,
+        mode,
+        dataOverlayContext,
+        type,
+        durationLimit,
+        stopCountLimit,
+        linkingContext
+      );
+      return taxiService != null && mode == StreetMode.TAXI
+        ? taxiService.filterNearbyStops(transitService, nearbyStops, type, request)
+        : nearbyStops;
+    };
+    var traffic = request.streetTraffic();
+    var accessEgresses =
+      traffic == StreetTrafficSnapshot.NONE
+        ? accessEgressMapper.mapNearbyStops(findStops.apply(accessRequest))
+        : TrafficAccessEgressRouter.find(
+            accessRequest,
+            new StreetPathAvailability.Horizon(
+              traffic,
+              transitSearchTimeZero.toInstant().toEpochMilli(),
+              additionalSearchDays.earliestJourneyTime().toEpochMilli(),
+              additionalSearchDays.latestJourneyTime().toEpochMilli()
+            ),
+            findStops,
+            accessEgressMapper::mapNearbyStop
+          );
     accessEgresses = timeshiftRideHailing(streetRequest, type, accessEgresses);
 
     var results = new ArrayList<>(accessEgresses);

@@ -1,9 +1,11 @@
 package org.opentripplanner.raptor.spi;
 
+import org.jspecify.annotations.Nullable;
 import org.opentripplanner.utils.time.DurationUtils;
 
 /**
- * Encapsulate information about a transfer path. Time dependent transfers are not supported.
+ * Encapsulate a transfer path. A time-dependent candidate is resolved at the stop arrival
+ * (departure in reverse searches) before the transfer is offered to the next round.
  */
 public interface RaptorTransfer {
   /**
@@ -25,6 +27,26 @@ public interface RaptorTransfer {
    * the journey origin, but just stop to stop.
    */
   int durationInSeconds();
+
+  /** Return the actual path and criteria at this search-direction time, or null if unavailable. */
+  default @Nullable RaptorTransfer atTime(int time) {
+    return this;
+  }
+
+  /** Lower bound used to sort transfer candidates and terminate a standard search's transfer loop. */
+  default int minimumDurationInSeconds() {
+    return durationInSeconds();
+  }
+
+  /** A resolved path may require the passenger to wait at the stop until its chosen departure. */
+  default int departureAfter(int readyTime) {
+    return readyTime;
+  }
+
+  /** Arrival time including any visit within a transfer. */
+  default int arrivalAfter(int departureTime) {
+    return departureTime + durationInSeconds();
+  }
 
   /** Call this from toString */
   default String asString() {

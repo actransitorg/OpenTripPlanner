@@ -20,6 +20,7 @@ import org.opentripplanner.model.plan.legreference.LegReference;
 import org.opentripplanner.model.plan.walkstep.WalkStep;
 import org.opentripplanner.routing.alertpatch.TransitAlert;
 import org.opentripplanner.street.model.elevation.ElevationProfile;
+import org.opentripplanner.street.model.traffic.StreetTrafficNotice;
 import org.opentripplanner.transfer.constrained.model.ConstrainedTransfer;
 import org.opentripplanner.transit.model.network.Route;
 import org.opentripplanner.transit.model.organization.Agency;
@@ -367,6 +368,11 @@ public interface Leg {
   }
 
   Set<TransitAlert> listTransitAlerts();
+
+  /** Reports matched to street segments that the traveler actually traverses. */
+  default List<StreetTrafficNotice> streetTrafficNotices() {
+    return List.of();
+  }
 
   @Nullable
   default PickDrop boardRule() {

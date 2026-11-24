@@ -33,9 +33,18 @@ public class StreetFlexPathCalculator implements FlexPathCalculator {
   private final Map<Vertex, ShortestPathTree<State, Edge, Vertex>> cache = new HashMap<>();
   private final boolean reverseDirection;
   private final Duration maxFlexTripDuration;
+  private final StreetSearchRequest streetRequest;
 
   public StreetFlexPathCalculator(boolean reverseDirection, Duration maxFlexTripDuration) {
-    this.reverseDirection = reverseDirection;
+    this(
+      StreetSearchRequest.of().withMode(StreetMode.CAR).withArriveBy(reverseDirection).build(),
+      maxFlexTripDuration
+    );
+  }
+
+  public StreetFlexPathCalculator(StreetSearchRequest streetRequest, Duration maxFlexTripDuration) {
+    this.streetRequest = streetRequest;
+    this.reverseDirection = streetRequest.arriveBy();
     this.maxFlexTripDuration = maxFlexTripDuration;
   }
 
@@ -68,12 +77,6 @@ public class StreetFlexPathCalculator implements FlexPathCalculator {
   }
 
   private ShortestPathTree<State, Edge, Vertex> routeToMany(Vertex vertex) {
-    // TODO: This is incorrect, the configured defaults are not used.
-    var streetRequest = StreetSearchRequest.of()
-      .withMode(StreetMode.CAR)
-      .withArriveBy(reverseDirection)
-      .build();
-
     return StreetSearchBuilder.of()
       .withPreStartHook(OTPRequestTimeoutException::checkForTimeout)
       .withSkipEdgeStrategy(new DurationSkipEdgeStrategy<>(maxFlexTripDuration))

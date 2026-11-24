@@ -67,6 +67,21 @@ public class LegType {
       )
       .field(
         GraphQLFieldDefinition.newFieldDefinition()
+          .name("streetTrafficNotices")
+          .description(
+            "Experimental traffic reports and speed observations on the street sections traveled in this leg."
+          )
+          .type(
+            GraphQLNonNull.nonNull(
+              GraphQLList.list(
+                GraphQLNonNull.nonNull(StreetTrafficNoticeType.create(dateTimeScalar))
+              )
+            )
+          )
+          .dataFetcher(env -> leg(env).streetTrafficNotices())
+      )
+      .field(
+        GraphQLFieldDefinition.newFieldDefinition()
           .name("id")
           .description(
             """

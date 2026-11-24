@@ -15,6 +15,7 @@ import org.opentripplanner.service.streetdetails.StreetDetailsService;
 import org.opentripplanner.street.graph.Graph;
 import org.opentripplanner.street.model.StreetMode;
 import org.opentripplanner.street.model.edge.ExtensionRequestContext;
+import org.opentripplanner.streetadapter.StreetSearchRequestMapper;
 import org.opentripplanner.transfer.regular.FlexTransferService;
 import org.opentripplanner.transit.service.TransitService;
 
@@ -67,7 +68,7 @@ public class FlexAccessEgressRouter {
       streetDetailsService,
       config,
       FilterMapper.map(request.journey().transit().filters()),
-      request.dateTime(),
+      StreetSearchRequestMapper.map(request).build(),
       request.bookingTime(),
       searchDays.additionalSearchDaysInPast(),
       searchDays.additionalSearchDaysInFuture(),

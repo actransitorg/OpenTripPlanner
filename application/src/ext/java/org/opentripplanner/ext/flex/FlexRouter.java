@@ -29,8 +29,10 @@ import org.opentripplanner.routing.algorithm.mapping.StreetPathToLegsMapper;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.service.streetdetails.StreetDetailsService;
 import org.opentripplanner.street.graph.Graph;
+import org.opentripplanner.street.model.StreetMode;
 import org.opentripplanner.street.model.path.StreetPath;
 import org.opentripplanner.street.model.vertex.TransitStopVertex;
+import org.opentripplanner.street.search.request.StreetSearchRequest;
 import org.opentripplanner.transfer.regular.FlexTransferService;
 import org.opentripplanner.transfer.regular.model.PathTransfer;
 import org.opentripplanner.transit.api.request.TripRequest;
@@ -72,7 +74,7 @@ public class FlexRouter {
     StreetDetailsService streetDetailsService,
     FlexParameters flexParameters,
     TripRequest filterRequest,
-    Instant requestedTime,
+    StreetSearchRequest streetRequest,
     @Nullable Instant requestedBookingTime,
     int additionalPastSearchDays,
     int additionalFutureSearchDays,
@@ -98,12 +100,16 @@ public class FlexRouter {
     );
 
     if (graph.hasStreets) {
+      var carRequest = StreetSearchRequest.of()
+        .withMode(StreetMode.CAR)
+        .withStartTime(streetRequest.startTime())
+        .withStreetTraffic(streetRequest.streetTraffic());
       this.accessFlexPathCalculator = new StreetFlexPathCalculator(
-        false,
+        carRequest.withArriveBy(false).build(),
         flexParameters.maxFlexTripDuration()
       );
       this.egressFlexPathCalculator = new StreetFlexPathCalculator(
-        true,
+        carRequest.withArriveBy(true).build(),
         flexParameters.maxFlexTripDuration()
       );
     } else {
@@ -113,6 +119,7 @@ public class FlexRouter {
       this.egressFlexPathCalculator = new DirectFlexPathCalculator();
     }
 
+    Instant requestedTime = streetRequest.startTime();
     ZoneId tz = transitService.getTimeZone();
     LocalDate searchDate = LocalDate.ofInstant(requestedTime, tz);
     this.startOfTime = ServiceDateUtils.asStartOfService(searchDate, tz);

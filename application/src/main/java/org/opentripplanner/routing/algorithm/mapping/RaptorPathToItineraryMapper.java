@@ -36,6 +36,8 @@ import org.opentripplanner.routing.algorithm.raptoradapter.transit.DefaultAccess
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RaptorTransitData;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RoutingAccessEgress;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.TripSchedule;
+import org.opentripplanner.routing.algorithm.raptoradapter.transit.request.TrafficAwareTransferService;
+import org.opentripplanner.routing.algorithm.raptoradapter.transit.request.TrafficAwareViaTransfer;
 import org.opentripplanner.routing.algorithm.transferoptimization.api.OptimizedPath;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.routing.via.model.ViaCoordinateTransfer;
@@ -355,6 +357,15 @@ public class RaptorPathToItineraryMapper<T extends TripSchedule> {
     var transferToStop = raptorTransitData.getStopByIndex(pathLeg.toStop());
 
     var raptorTransfer = pathLeg.transfer();
+    if (raptorTransfer instanceof TrafficAwareTransferService.Resolved resolved) {
+      return streetPathToLegsMapper.map(resolved.path(), request);
+    }
+    if (raptorTransfer instanceof TrafficAwareViaTransfer.Resolved resolved) {
+      return ListUtils.combine(
+        streetPathToLegsMapper.map(resolved.toVia(), request),
+        streetPathToLegsMapper.map(resolved.fromVia(), request)
+      );
+    }
 
     Place from = Place.forStop(transferFromStop);
     Place to = Place.forStop(transferToStop);
@@ -464,19 +475,16 @@ public class RaptorPathToItineraryMapper<T extends TripSchedule> {
     se.setTimeSeconds(createZonedDateTime(fromTime).toEpochSecond());
 
     State s = se.makeState();
-    ArrayList<State> transferStates = new ArrayList<>();
-    transferStates.add(s);
     for (Edge e : edges) {
       var states = e.traverse(s);
       if (State.isEmpty(states)) {
-        s = null;
-      } else {
-        transferStates.add(states[0]);
-        s = states[0];
+        throw new IllegalStateException(
+          "Selected transfer is impassable during itinerary reconstruction"
+        );
       }
+      s = states[0];
     }
-    State[] states = transferStates.toArray(State[]::new);
-    var graphPath = new StreetPath(states[states.length - 1]);
+    var graphPath = new StreetPath(s);
     return streetPathToLegsMapper.map(graphPath, request);
   }
 

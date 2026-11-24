@@ -53,6 +53,7 @@ public class StreetSearchRequestMapper {
     var street = preferences.street();
     var streetSearchRequestBuilder = StreetSearchRequest.of()
       .withStartTime(time)
+      .withStreetTraffic(request.streetTraffic())
       .withArriveBy(request.arriveBy())
       .withFromEnvelope(createEnvelope(request.from()))
       .withToEnvelope(createEnvelope(request.to()))

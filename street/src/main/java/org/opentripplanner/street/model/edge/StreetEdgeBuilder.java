@@ -12,9 +12,11 @@ import static org.opentripplanner.street.model.edge.StreetEdge.STAIRS_FLAG_INDEX
 import static org.opentripplanner.street.model.edge.StreetEdge.WALK_NOTHRUTRAFFIC;
 import static org.opentripplanner.street.model.edge.StreetEdge.WHEELCHAIR_ACCESSIBLE_FLAG_INDEX;
 
+import org.jspecify.annotations.Nullable;
 import org.locationtech.jts.geom.LineString;
 import org.opentripplanner.core.model.i18n.I18NString;
 import org.opentripplanner.core.model.i18n.NonLocalizedString;
+import org.opentripplanner.street.model.OsmWayIdentity;
 import org.opentripplanner.street.model.StreetTraversalPermission;
 import org.opentripplanner.street.model.vertex.StreetVertex;
 import org.opentripplanner.street.search.TraverseMode;
@@ -39,6 +41,7 @@ public class StreetEdgeBuilder<B extends StreetEdgeBuilder<B>> {
   private float bicycleSafetyFactor;
   private short flags;
   private StreetElevationExtension streetElevationExtension;
+  private @Nullable OsmWayIdentity wayIdentity;
 
   public StreetEdgeBuilder() {
     this.defaultLength = true;
@@ -60,6 +63,7 @@ public class StreetEdgeBuilder<B extends StreetEdgeBuilder<B>> {
     this.walkSafetyFactor = original.getWalkSafetyFactor();
     this.bicycleSafetyFactor = original.getBicycleSafetyFactor();
     this.flags = original.getFlags();
+    this.wayIdentity = original.getWayIdentity();
   }
 
   public StreetEdge buildAndConnect() {
@@ -86,6 +90,15 @@ public class StreetEdgeBuilder<B extends StreetEdgeBuilder<B>> {
 
   public LineString geometry() {
     return geometry;
+  }
+
+  public @Nullable OsmWayIdentity wayIdentity() {
+    return wayIdentity;
+  }
+
+  public B withWayIdentity(@Nullable OsmWayIdentity identity) {
+    this.wayIdentity = identity;
+    return instance();
   }
 
   public B withGeometry(LineString geometry) {

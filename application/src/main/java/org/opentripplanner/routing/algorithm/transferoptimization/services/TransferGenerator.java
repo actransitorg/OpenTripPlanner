@@ -160,10 +160,14 @@ public class TransferGenerator<T extends RaptorTripSchedule> {
   private Collection<? extends TripToTripTransfer<T>> findStandardTransfers(TripStopTime<T> from) {
     final List<TripToTripTransfer<T>> result = new ArrayList<>();
     Iterator<? extends RaptorTransfer> transfers = stdTransfers.getTransfersFromStop(from.stop());
+    int ready = from.time() + slackProvider.alightSlack(fromTrip.pattern().slackIndex());
 
     // Loop through transfers and decide whether they are possible
     while (transfers.hasNext()) {
-      var it = transfers.next();
+      var it = transfers.next().atTime(ready);
+      if (it == null) {
+        continue;
+      }
       int toStop = it.stop();
 
       // Find all possible transfers on given stop index, starting on from.time

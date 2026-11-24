@@ -14,6 +14,7 @@ import org.opentripplanner.astar.spi.AStarRequest;
 import org.opentripplanner.service.vehiclerental.model.GeofencingZone;
 import org.opentripplanner.street.model.StreetMode;
 import org.opentripplanner.street.model.edge.ExtensionRequestContext;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.street.model.vertex.Vertex;
 import org.opentripplanner.street.search.TraverseMode;
 import org.opentripplanner.street.search.intersection_model.IntersectionTraversalCalculator;
@@ -48,6 +49,7 @@ public class StreetSearchRequest implements AStarRequest {
   private final ElevatorRequest elevator;
   private final IntersectionTraversalCalculator intersectionTraversalCalculator;
   private final List<ExtensionRequestContext> extensionRequestContexts;
+  private final StreetTrafficSnapshot streetTraffic;
   private final Duration timeout;
 
   /**
@@ -81,6 +83,7 @@ public class StreetSearchRequest implements AStarRequest {
     this.rentalPeriod = null;
     this.intersectionTraversalCalculator = IntersectionTraversalCalculator.DEFAULT;
     this.extensionRequestContexts = List.of();
+    this.streetTraffic = StreetTrafficSnapshot.NONE;
     this.timeout = Duration.ofSeconds(5);
     this.arriveByDestinationZones = Set.of();
   }
@@ -103,6 +106,7 @@ public class StreetSearchRequest implements AStarRequest {
     this.rentalPeriod = builder.rentalPeriod;
     this.intersectionTraversalCalculator = requireNonNull(builder.intersectionTraversalCalculator);
     this.extensionRequestContexts = List.copyOf(requireNonNull(builder.extensionRequestContexts));
+    this.streetTraffic = requireNonNull(builder.streetTraffic);
     this.timeout = requireNonNull(builder.timeout);
     if (!arriveBy && !builder.arriveByDestinationZones.isEmpty()) {
       throw new IllegalArgumentException(
@@ -189,6 +193,10 @@ public class StreetSearchRequest implements AStarRequest {
 
   public List<ExtensionRequestContext> listExtensionRequestContexts() {
     return extensionRequestContexts;
+  }
+
+  public StreetTrafficSnapshot streetTraffic() {
+    return streetTraffic;
   }
 
   public StreetSearchRequestBuilder copyOfReversed(Instant time) {

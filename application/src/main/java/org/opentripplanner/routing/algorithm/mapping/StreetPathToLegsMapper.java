@@ -340,6 +340,7 @@ public class StreetPathToLegsMapper {
         subPath.elevation(firstState.getRequest().geoidElevation(), ellipsoidToGeoidDifference)
       )
       .withWalkSteps(walkSteps)
+      .withTrafficNotices(subPath.trafficNotices(delay == null ? 0 : delay.toMillis()))
       .withRentedVehicle(firstState.isRentingVehicle())
       .withWalkingBike(false);
 

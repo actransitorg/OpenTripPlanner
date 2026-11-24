@@ -19,6 +19,7 @@ import org.opentripplanner.routing.linking.LinkingContext;
 import org.opentripplanner.service.streetdetails.StreetDetailsService;
 import org.opentripplanner.street.graph.Graph;
 import org.opentripplanner.street.model.StreetMode;
+import org.opentripplanner.streetadapter.StreetSearchRequestMapper;
 import org.opentripplanner.transfer.regular.FlexTransferService;
 import org.opentripplanner.transit.service.TransitService;
 
@@ -70,7 +71,7 @@ public class DirectFlexRouter {
       streetDetailsService,
       flexParameters,
       FilterMapper.map(request.journey().transit().filters()),
-      request.dateTime(),
+      StreetSearchRequestMapper.map(request).build(),
       request.bookingTime(),
       additionalSearchDays.additionalSearchDaysInPast(),
       additionalSearchDays.additionalSearchDaysInFuture(),

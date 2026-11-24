@@ -121,6 +121,7 @@ public enum OTPFeature {
   CarPooling(false, true, "Enable the carpooling sandbox module."),
   Emission(false, true, "Enable the emission sandbox module."),
   TaxiRouting(false, true, "Enable the taxi routing sandbox module."),
+  Traffic511(false, true, "Enable Bay Area traffic data for street routing."),
   EmpiricalDelay(false, true, "Enable empirical delay sandbox module."),
   DataOverlay(
     false,

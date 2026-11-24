@@ -443,6 +443,8 @@ type Leg {
   situations: [PtSituationElement!]!
   "Do we continue from a specified via place"
   steps: [PathGuidance]!
+  "Experimental traffic reports and speed observations on the street sections traveled in this leg."
+  streetTrafficNotices: [StreetTrafficNotice!]!
   "EstimatedCall for the quay where the leg ends."
   toEstimatedCall: EstimatedCall @timingData
   "The Place where the leg ends."
@@ -1444,6 +1446,20 @@ type StopToStopGeometry {
   pointsOnLink: PointsOnLink
   "Destination Quay"
   toQuay: Quay
+}
+
+"A source report that applies to a traveled street section."
+type StreetTrafficNotice {
+  "How the source report applies, for example ADVISORY, REPORTED_DELAY or MEASURED_SPEED."
+  basis: String!
+  "Time the source published or observed the condition, when available."
+  reportedAt: DateTime
+  "Publishing data source."
+  source: String!
+  "Event or detector identifier in the source feed."
+  sourceId: String!
+  "Description of the condition."
+  summary: String!
 }
 
 """

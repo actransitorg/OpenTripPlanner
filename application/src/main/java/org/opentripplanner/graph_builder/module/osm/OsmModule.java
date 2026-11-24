@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineString;
 import org.opentripplanner.core.model.i18n.I18NString;
+import org.opentripplanner.framework.application.OTPFeature;
 import org.opentripplanner.graph_builder.issue.api.DataImportIssueStore;
 import org.opentripplanner.graph_builder.model.GraphBuilderModule;
 import org.opentripplanner.graph_builder.module.cache.CacheTask;
@@ -52,6 +53,7 @@ import org.opentripplanner.service.vehicleparking.model.VehicleParking;
 import org.opentripplanner.street.StreetRepository;
 import org.opentripplanner.street.geometry.GeometryUtils;
 import org.opentripplanner.street.graph.Graph;
+import org.opentripplanner.street.model.OsmWayIdentity;
 import org.opentripplanner.street.model.StreetModelDetails;
 import org.opentripplanner.street.model.StreetTraversalPermission;
 import org.opentripplanner.street.model.edge.StreetEdge;
@@ -392,6 +394,21 @@ public class OsmModule implements GraphBuilderModule {
 
       float forwardCarSpeed = carSpeedIndex.forward(way.getId());
       float backwardCarSpeed = carSpeedIndex.backward(way.getId());
+      var wayIdentity = OTPFeature.Traffic511.isOnElseNull(() ->
+        new OsmWayIdentity(
+          way.getId(),
+          way.getTag("name"),
+          way.getTag("ref"),
+          way.getTag("highway"),
+          way.getTag("footway"),
+          way.getTag("layer"),
+          way.getTag("bridge"),
+          way.getTag("tunnel"),
+          way.getTag("direction:forward"),
+          way.getTag("direction:backward"),
+          way.getTag("hov")
+        )
+      );
 
       IntersectionVertex fromVertex = null;
       IntersectionVertex toVertex = null;
@@ -510,6 +527,7 @@ public class OsmModule implements GraphBuilderModule {
             fromVertex,
             toVertex,
             way,
+            wayIdentity,
             i,
             forwardPermission,
             backwardPermission,
@@ -658,6 +676,7 @@ public class OsmModule implements GraphBuilderModule {
     IntersectionVertex fromVertex,
     IntersectionVertex toVertex,
     OsmWay way,
+    @Nullable OsmWayIdentity wayIdentity,
     int index,
     StreetTraversalPermission forwardPermission,
     StreetTraversalPermission backwardPermission,
@@ -680,6 +699,7 @@ public class OsmModule implements GraphBuilderModule {
         fromVertex,
         toVertex,
         way,
+        wayIdentity,
         index,
         length,
         forwardPermission,
@@ -693,6 +713,7 @@ public class OsmModule implements GraphBuilderModule {
         toVertex,
         fromVertex,
         way,
+        wayIdentity,
         index,
         length,
         backwardPermission,
@@ -711,6 +732,7 @@ public class OsmModule implements GraphBuilderModule {
     IntersectionVertex fromVertex,
     IntersectionVertex toVertex,
     OsmWay way,
+    @Nullable OsmWayIdentity wayIdentity,
     int index,
     double length,
     StreetTraversalPermission permissions,
@@ -734,6 +756,7 @@ public class OsmModule implements GraphBuilderModule {
       });
 
     StreetEdgeBuilder<?> seb = new StreetEdgeBuilder<>()
+      .withWayIdentity(wayIdentity)
       .withFromVertex(fromVertex)
       .withToVertex(toVertex)
       .withGeometry(geometry)

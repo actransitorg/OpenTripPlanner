@@ -24,6 +24,7 @@ import org.opentripplanner.routing.error.InvalidRoutingInputException;
 import org.opentripplanner.routing.error.RoutingValidationException;
 import org.opentripplanner.standalone.config.routerconfig.TransitRoutingConfig;
 import org.opentripplanner.street.model.StreetMode;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.utils.collection.ListSection;
 import org.opentripplanner.utils.time.TimeUtils;
 import org.opentripplanner.utils.tostring.ToStringBuilder;
@@ -71,6 +72,9 @@ public class RouteRequest implements Serializable {
   private final int numItineraries;
   private final boolean defaultRequest;
 
+  /** Runtime data is supplied by the routing service and excluded from serialized requests. */
+  private final transient StreetTrafficSnapshot streetTraffic;
+
   /* CONSTRUCTORS */
 
   private RouteRequest() {
@@ -89,6 +93,7 @@ public class RouteRequest implements Serializable {
     this.preferences = RoutingPreferences.DEFAULT;
     this.numItineraries = DEFAULT_NUM_ITINERARIES;
     this.defaultRequest = true;
+    this.streetTraffic = StreetTrafficSnapshot.NONE;
   }
 
   RouteRequest(RouteRequestBuilder builder) {
@@ -114,6 +119,7 @@ public class RouteRequest implements Serializable {
     this.preferences = builder.preferences;
     this.numItineraries = builder.numItineraries;
     this.defaultRequest = builder.defaultRequest;
+    this.streetTraffic = builder.streetTraffic;
 
     validate();
   }
@@ -142,6 +148,10 @@ public class RouteRequest implements Serializable {
 
   public RoutingPreferences preferences() {
     return preferences;
+  }
+
+  public StreetTrafficSnapshot streetTraffic() {
+    return streetTraffic == null ? StreetTrafficSnapshot.NONE : streetTraffic;
   }
 
   /**
@@ -466,6 +476,7 @@ public class RouteRequest implements Serializable {
       arriveBy == other.arriveBy &&
       timetableView == other.timetableView &&
       numItineraries == other.numItineraries &&
+      streetTraffic() == other.streetTraffic() &&
       Objects.equals(from, other.from) &&
       Objects.equals(to, other.to) &&
       Objects.equals(via, other.via) &&
@@ -494,7 +505,8 @@ public class RouteRequest implements Serializable {
       pageCursor,
       journey,
       preferences,
-      numItineraries
+      numItineraries,
+      System.identityHashCode(streetTraffic())
     );
   }
 

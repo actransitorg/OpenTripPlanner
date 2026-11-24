@@ -1,6 +1,7 @@
 package org.opentripplanner.routing.algorithm.raptoradapter.router;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.Period;
 import java.time.ZonedDateTime;
 import java.util.Objects;
@@ -85,6 +86,19 @@ public class AdditionalSearchDays {
 
   private Duration getSearchWindowOrElseMax() {
     return Objects.requireNonNullElse(searchWindow, maxSearchWindow);
+  }
+
+  /** Absolute limits on any street legs RAPTOR may place in this journey search. */
+  public Instant earliestJourneyTime() {
+    return arriveBy
+      ? searchDateTime.toInstant().minus(maxJourneyDuration).minus(getSearchWindowOrElseMax())
+      : searchDateTime.toInstant();
+  }
+
+  public Instant latestJourneyTime() {
+    return arriveBy
+      ? searchDateTime.toInstant()
+      : searchDateTime.toInstant().plus(maxJourneyDuration).plus(getSearchWindowOrElseMax());
   }
 
   private int daysInBetween(ZonedDateTime requestTime, ZonedDateTime earliestStart) {

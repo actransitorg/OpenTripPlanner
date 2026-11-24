@@ -3,6 +3,7 @@ package org.opentripplanner.street.graph;
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.inject.Inject;
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.StreamSupport;
 import org.jspecify.annotations.Nullable;
 import org.locationtech.jts.geom.Envelope;
@@ -23,6 +25,7 @@ import org.opentripplanner.street.geometry.GeometryUtils;
 import org.opentripplanner.street.model.edge.Edge;
 import org.opentripplanner.street.model.edge.StreetEdge;
 import org.opentripplanner.street.model.openinghours.OpeningHoursCalendarService;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.street.model.vertex.StationCentroidVertex;
 import org.opentripplanner.street.model.vertex.TransitStopVertex;
 import org.opentripplanner.street.model.vertex.Vertex;
@@ -67,6 +70,8 @@ public class Graph implements Serializable {
   private final OpeningHoursCalendarService openingHoursCalendarService;
 
   private transient StreetIndex streetIndex;
+
+  private transient volatile Function<Instant, StreetTrafficSnapshot> streetTrafficSource;
 
   /** The convex hull of all the graph vertices. Generated at the time the Graph is built. */
   private Geometry convexHull = null;
@@ -123,6 +128,17 @@ public class Graph implements Serializable {
   /** Constructor for deserialization. */
   public Graph() {
     this(null);
+  }
+
+  /** Publish completely processed conditions from the street updater's writer thread. */
+  public void setStreetTrafficSnapshotSource(Function<Instant, StreetTrafficSnapshot> source) {
+    this.streetTrafficSource = source;
+  }
+
+  /** Pin current observations and their freshness once for a routing request. */
+  public StreetTrafficSnapshot streetTrafficSnapshot() {
+    var source = streetTrafficSource;
+    return source == null ? StreetTrafficSnapshot.NONE : source.apply(Instant.now());
   }
 
   /** Add the given vertex to the graph. */

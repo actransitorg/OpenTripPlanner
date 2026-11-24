@@ -35,6 +35,10 @@ public final class RaptorTransferViaConnection extends ViaConnection {
     return minimumWaitTime + transfer.durationInSeconds();
   }
 
+  public int minimumWaitTime() {
+    return minimumWaitTime;
+  }
+
   int c1() {
     return transfer.c1();
   }

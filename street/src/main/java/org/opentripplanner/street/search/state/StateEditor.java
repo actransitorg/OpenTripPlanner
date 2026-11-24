@@ -167,6 +167,10 @@ public class StateEditor {
     incrementTimeInMilliseconds(1000L * seconds);
   }
 
+  public long getTimeMilliseconds() {
+    return time_ms;
+  }
+
   /**
    * Increment the distance traversed through the graph in meters.
    */

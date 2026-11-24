@@ -27,6 +27,9 @@ import org.jspecify.annotations.Nullable;
 import org.opentripplanner.ext.siri.updater.azure.SiriAzureETUpdaterParameters;
 import org.opentripplanner.ext.siri.updater.azure.SiriAzureSXUpdaterParameters;
 import org.opentripplanner.ext.siri.updater.mqtt.MqttSiriETUpdaterParameters;
+import org.opentripplanner.ext.traffic511.PemsParameters;
+import org.opentripplanner.ext.traffic511.Traffic511Parameters;
+import org.opentripplanner.ext.traffic511.TrafficReplay;
 import org.opentripplanner.ext.vehiclerentalservicedirectory.VehicleRentalServiceDirectoryFetcher;
 import org.opentripplanner.ext.vehiclerentalservicedirectory.api.VehicleRentalServiceDirectoryFetcherParameters;
 import org.opentripplanner.framework.transaction.TimetableSnapshotParameters;
@@ -45,6 +48,7 @@ import org.opentripplanner.standalone.config.routerconfig.updaters.VehiclePositi
 import org.opentripplanner.standalone.config.routerconfig.updaters.VehicleRentalUpdaterConfig;
 import org.opentripplanner.standalone.config.routerconfig.updaters.azure.SiriAzureETUpdaterConfig;
 import org.opentripplanner.standalone.config.routerconfig.updaters.azure.SiriAzureSXUpdaterConfig;
+import org.opentripplanner.standalone.config.sandbox.Traffic511Config;
 import org.opentripplanner.standalone.config.sandbox.VehicleRentalServiceDirectoryFetcherConfig;
 import org.opentripplanner.updater.UpdatersParameters;
 import org.opentripplanner.updater.alert.gtfs.GtfsRealtimeAlertsUpdaterParameters;
@@ -221,6 +225,21 @@ public class UpdatersConfig implements UpdatersParameters {
   }
 
   @Override
+  public List<Traffic511Parameters> getTraffic511Parameters() {
+    return getParameters(Type.TRAFFIC_511);
+  }
+
+  @Override
+  public List<TrafficReplay.Parameters> getTrafficReplayParameters() {
+    return getParameters(Type.TRAFFIC_511_REPLAY);
+  }
+
+  @Override
+  public List<PemsParameters> getPemsParameters() {
+    return getParameters(Type.CALTRANS_PEMS);
+  }
+
+  @Override
   public List<SiriAzureSXUpdaterParameters> getSiriAzureSXUpdaterParameters() {
     return getParameters(SIRI_AZURE_SX_UPDATER);
   }
@@ -235,6 +254,9 @@ public class UpdatersConfig implements UpdatersParameters {
   }
 
   public enum Type {
+    TRAFFIC_511(Traffic511Config::events),
+    TRAFFIC_511_REPLAY(Traffic511Config::replay),
+    CALTRANS_PEMS(Traffic511Config::pems),
     // TODO: deprecated, remove in next major version
     BIKE_PARK(VehicleParkingUpdaterConfig::create),
     VEHICLE_PARKING(VehicleParkingUpdaterConfig::create),

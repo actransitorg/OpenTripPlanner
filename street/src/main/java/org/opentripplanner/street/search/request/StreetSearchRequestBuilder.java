@@ -10,6 +10,7 @@ import org.locationtech.jts.geom.Envelope;
 import org.opentripplanner.service.vehiclerental.model.GeofencingZone;
 import org.opentripplanner.street.model.StreetMode;
 import org.opentripplanner.street.model.edge.ExtensionRequestContext;
+import org.opentripplanner.street.model.traffic.StreetTrafficSnapshot;
 import org.opentripplanner.street.search.intersection_model.IntersectionTraversalCalculator;
 
 public class StreetSearchRequestBuilder {
@@ -34,6 +35,7 @@ public class StreetSearchRequestBuilder {
 
   IntersectionTraversalCalculator intersectionTraversalCalculator;
   Collection<ExtensionRequestContext> extensionRequestContexts;
+  StreetTrafficSnapshot streetTraffic;
   Duration timeout;
   Set<GeofencingZone> arriveByDestinationZones;
 
@@ -55,6 +57,7 @@ public class StreetSearchRequestBuilder {
     this.rentalPeriod = original.rentalPeriod();
     this.intersectionTraversalCalculator = original.intersectionTraversalCalculator();
     this.extensionRequestContexts = original.listExtensionRequestContexts();
+    this.streetTraffic = original.streetTraffic();
     this.timeout = original.timeout();
     this.arriveByDestinationZones = original.arriveByDestinationZones();
   }
@@ -150,6 +153,11 @@ public class StreetSearchRequestBuilder {
 
   public StreetSearchRequestBuilder withTimeout(Duration duration) {
     this.timeout = duration;
+    return this;
+  }
+
+  public StreetSearchRequestBuilder withStreetTraffic(StreetTrafficSnapshot streetTraffic) {
+    this.streetTraffic = streetTraffic;
     return this;
   }
 

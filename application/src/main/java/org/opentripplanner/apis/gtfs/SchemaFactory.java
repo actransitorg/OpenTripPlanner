@@ -71,6 +71,7 @@ import org.opentripplanner.apis.gtfs.datafetchers.StopOnTripImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.StopRelationshipImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.StoptimeImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.StoptimesInPatternImpl;
+import org.opentripplanner.apis.gtfs.datafetchers.StreetTrafficNoticeImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.SystemNoticeImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.TicketTypeImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.TranslatedStringImpl;
@@ -214,6 +215,7 @@ public class SchemaFactory {
         .type(typeWiring.build(StopCallOnTripOnServiceDateImpl.class))
         .type(typeWiring.build(TripOccupancyImpl.class))
         .type(typeWiring.build(LegTimeImpl.class))
+        .type(typeWiring.build(StreetTrafficNoticeImpl.class))
         .type(typeWiring.build(RealTimeEstimateImpl.class))
         .type(typeWiring.build(EstimatedTimeImpl.class))
         .type(typeWiring.build(EntranceImpl.class))

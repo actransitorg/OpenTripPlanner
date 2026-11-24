@@ -1,0 +1,58 @@
+{
+  "type": "FeatureCollection",
+  "road_event_feed_info": {
+    "version": "4.1",
+    "update_date": "2026-11-25T06:00:00Z",
+    "publisher": "OpenTripPlanner synthetic replay",
+    "data_sources": [
+      {
+        "data_source_id": "test",
+        "organization_name": "OpenTripPlanner synthetic replay",
+        "update_date": "2026-11-25T06:00:00Z"
+      }
+    ]
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "oakland-ramp-demo",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-122.286179, 37.8269874],
+          [-122.2866732, 37.8268672],
+          [-122.2870855, 37.8267658],
+          [-122.2873385, 37.8267284],
+          [-122.2876006, 37.8267084],
+          [-122.2878517, 37.826705],
+          [-122.2881128, 37.8267138],
+          [-122.2883754, 37.8267353],
+          [-122.2885433, 37.8267566]
+        ]
+      },
+      "properties": {
+        "core_details": {
+          "event_type": "work-zone",
+          "direction": "westbound",
+          "road_names": ["I-580"],
+          "data_source_id": "test",
+          "description": "Synthetic closure on the westbound I-580 movement to eastbound I-80"
+        },
+        "event_status": "active",
+        "vehicle_impact": "all-lanes-closed",
+        "start_date": "2026-11-25T07:00:00Z",
+        "end_date": "2026-11-25T13:30:00Z",
+        "beginning_accuracy": "estimated",
+        "ending_accuracy": "estimated",
+        "start_date_accuracy": "estimated",
+        "end_date_accuracy": "estimated",
+        "location_method": "unknown",
+        "types_of_work": [
+          {
+            "type_name": "surface-work"
+          }
+        ]
+      }
+    }
+  ]
+}

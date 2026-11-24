@@ -33,6 +33,7 @@ import org.opentripplanner.routing.algorithm.raptoradapter.transit.mappers.Direc
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.mappers.RaptorRequestMapper;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.request.DefaultTransitDataProviderFilter;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.request.RaptorRoutingRequestTransitData;
+import org.opentripplanner.routing.algorithm.raptoradapter.transit.request.TrafficAwareTransferService;
 import org.opentripplanner.routing.algorithm.transferoptimization.configure.TransferOptimizationServiceConfigurator;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.routing.api.response.InputField;
@@ -365,7 +366,7 @@ public class TransitRouter {
   ) {
     return new RaptorRoutingRequestTransitData(
       raptorTransitData,
-      regularTransfers.raptorTransfers(),
+      TrafficAwareTransferService.of(regularTransfers, request, transitSearchTimeZero),
       transitGroupPriorityService,
       transitSearchTimeZero,
       additionalSearchDays.additionalSearchDaysInPast(),

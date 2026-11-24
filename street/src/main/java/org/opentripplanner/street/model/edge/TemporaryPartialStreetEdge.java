@@ -34,6 +34,7 @@ public final class TemporaryPartialStreetEdge extends StreetEdge implements Temp
     return fromCoord.equals(toCoord);
   }
 
+  @Override
   public StreetEdge getParentEdge() {
     return parentEdge;
   }
