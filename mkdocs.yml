@@ -135,6 +135,8 @@ nav:
     - Interactive OTP Launcher: 'sandbox/InteractiveOtpMain.md'
     - Park and Ride API: 'sandbox/ParkAndRideApi.md'
     - Data Overlay: 'sandbox/DataOverlay.md'
+    - Bay Area regional transit and road traffic: 'sandbox/Traffic511.md'
+    - Bay Area replay results: 'sandbox/Traffic511Replay.md'
     - Vehicle Parking Updaters: 'sandbox/VehicleParking.md'
     - Geocoder API: 'sandbox/GeocoderAPI.md'
     - IBI Accessibility Score: 'sandbox/IBIAccessibilityScore.md'

@@ -12,6 +12,11 @@
 **Extensions** -- All features implemented in the OTP Sandbox, provided with no guarantees.
 (`src/ext`, `src/ext-test`)
 
+## Available extensions
+
+The [Bay Area road traffic](sandbox/Traffic511.md) sandbox combines road closures and freeway speeds
+with street routing.
+
 ## Sandbox Goals
 
 - Reduce work for PR approval

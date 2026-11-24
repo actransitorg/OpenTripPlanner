@@ -9,6 +9,12 @@ avoiding a closed ramp, a cyclist or wheelchair user finding a usable alternativ
 rider making a different connection when conditions change. A deployment pilot follows once the
 replay demonstrates those outcomes.
 
+Use the consolidated regional feed throughout. Download the active GTFS timetable with
+`operator_id=RG` and TripUpdates, ServiceAlerts and VehiclePositions with `agency=RG`. Assign
+the static feed and all three realtime updaters the same OTP feed ID, `RG`. Compare static-only
+and agency-updated plans first, then measure the incremental effects of road conditions on the
+same regional itineraries. [Regional replay results](../../user/sandbox/Traffic511Replay.md)
+
 ## Evidence from the feeds
 
 The following results came from a read-only sample on November 24, 2026. Counts describe the sampled
