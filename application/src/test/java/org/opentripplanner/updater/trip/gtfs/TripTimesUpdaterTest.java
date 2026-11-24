@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.opentripplanner.updater.spi.UpdateErrorType.INVALID_ARRIVAL_TIME;
 import static org.opentripplanner.updater.spi.UpdateErrorType.INVALID_DEPARTURE_TIME;
@@ -22,6 +23,7 @@ import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeUpdate;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
@@ -38,6 +40,7 @@ import org.opentripplanner.transit.dataimport.TimetableDataImport;
 import org.opentripplanner.transit.model.framework.Deduplicator;
 import org.opentripplanner.transit.model.network.TripPattern;
 import org.opentripplanner.transit.model.timetable.RealTimeTripTimes;
+import org.opentripplanner.transit.model.timetable.ScheduledTripTimes;
 import org.opentripplanner.transit.model.timetable.Timetable;
 import org.opentripplanner.transit.model.timetable.TripTimes;
 import org.opentripplanner.transit.service.TransitRepository;
@@ -133,6 +136,79 @@ public class TripTimesUpdaterTest {
         BackwardsDelayPropagationType.REQUIRED_NO_DATA
       )
     );
+  }
+
+  @Test
+  void matchOneBasedPositionsOnlyWithIndependentWholeUpdateProof() throws Exception {
+    var scheduled = (ScheduledTripTimes) timetable.getTripTimes(tripId);
+    var sparse = timetable
+      .copyOf()
+      .addOrUpdateTripTimes(
+        scheduled
+          .copyOfNoDuplication()
+          .withGtfsSequenceOfStopIndex(new int[] { 2, 4, 6 })
+          .build()
+      )
+      .build();
+    var firstId = sparse.getPattern().getStop(0).getId().getId();
+    var secondId = sparse.getPattern().getStop(1).getId().getId();
+    var source = new TripUpdateBuilder(TRIP_ID, SERVICE_DATE, SCHEDULED, TIME_ZONE)
+      .addStopTime(1, "00:02:00")
+      .addStopTime(2, "00:12:00")
+      .build()
+      .toBuilder();
+    source.getStopTimeUpdateBuilder(0).setStopId(firstId);
+    source.getStopTimeUpdateBuilder(1).setStopId(secondId);
+    var times = sparse.getTripTimes(tripId);
+    var forwards = ForwardsDelayPropagationType.DEFAULT;
+    var backwards = BackwardsDelayPropagationType.REQUIRED_NO_DATA;
+    var raw = source.build();
+    assertFailure(INVALID_STOP_SEQUENCE, () ->
+      TRIP_TIMES_UPDATER.createUpdatedTripTimesFromGtfsRt(
+        sparse,
+        new TripUpdate(feedId, raw, NOW),
+        forwards,
+        backwards
+      )
+    );
+    var corrected = StopSequenceReconciler.reconcile(raw, sparse, times);
+    var actual = TRIP_TIMES_UPDATER.createUpdatedTripTimesFromGtfsRt(
+      sparse,
+      new TripUpdate(feedId, corrected, NOW),
+      forwards,
+      backwards
+    ).tripTimes();
+    assertEquals(120, actual.getArrivalTime(0));
+    assertEquals(720, actual.getArrivalTime(1));
+    assertEquals(2, raw.getStopTimeUpdate(1).getStopSequence());
+    assertEquals(4, corrected.getStopTimeUpdate(1).getStopSequence());
+    assertSame(corrected, StopSequenceReconciler.reconcile(corrected, sparse, times));
+
+    var missingId = source.clone();
+    missingId.getStopTimeUpdateBuilder(1).clearStopId();
+    var offPattern = source.clone();
+    offPattern.getStopTimeUpdateBuilder(1).setStopId("elsewhere");
+    var assigned = source.clone();
+    assigned.getStopTimeUpdateBuilder(1).getStopTimePropertiesBuilder().setAssignedStopId(firstId);
+    for (var invalid : List.of(missingId.build(), offPattern.build(), assigned.build())) {
+      assertSame(invalid, StopSequenceReconciler.reconcile(invalid, sparse, times));
+    }
+
+    var unordered = corrected
+      .toBuilder()
+      .clearStopTimeUpdate()
+      .addAllStopTimeUpdate(corrected.getStopTimeUpdateList().reversed())
+      .build();
+    assertEquals(corrected, StopSequenceReconciler.reconcile(unordered, sparse, times));
+    var duplicate = unordered.toBuilder().addStopTimeUpdate(unordered.getStopTimeUpdate(0)).build();
+    assertSame(duplicate, StopSequenceReconciler.reconcile(duplicate, sparse, times));
+    var overlap = unordered.toBuilder();
+    overlap
+      .getStopTimeUpdateBuilder(0)
+      .getArrivalBuilder()
+      .setTime(unordered.getStopTimeUpdate(1).getDeparture().getTime() - 1);
+    var reversedTime = overlap.build();
+    assertSame(reversedTime, StopSequenceReconciler.reconcile(reversedTime, sparse, times));
   }
 
   @Test

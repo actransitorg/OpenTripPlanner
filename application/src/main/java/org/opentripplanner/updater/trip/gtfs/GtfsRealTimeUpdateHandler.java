@@ -31,6 +31,7 @@ public class GtfsRealTimeUpdateHandler {
 
   private final TimetableRepository buffer;
   private final Supplier<LocalDate> localDateNow;
+  private final boolean reconcileStopSequence;
   private final ScheduledTripHandler scheduledTripHandler;
   private final NewTripHandler addedTripHandler;
   private final CanceledTripHandler canceledTripHandler;
@@ -39,6 +40,7 @@ public class GtfsRealTimeUpdateHandler {
   GtfsRealTimeUpdateHandler(
     TimetableRepository buffer,
     Supplier<LocalDate> localDateNow,
+    boolean reconcileStopSequence,
     ScheduledTripHandler scheduledTripHandler,
     NewTripHandler addedTripHandler,
     CanceledTripHandler canceledTripHandler,
@@ -46,6 +48,7 @@ public class GtfsRealTimeUpdateHandler {
   ) {
     this.buffer = buffer;
     this.localDateNow = localDateNow;
+    this.reconcileStopSequence = reconcileStopSequence;
     this.scheduledTripHandler = scheduledTripHandler;
     this.addedTripHandler = addedTripHandler;
     this.canceledTripHandler = canceledTripHandler;
@@ -85,11 +88,15 @@ public class GtfsRealTimeUpdateHandler {
     for (var rawTripUpdate : updates) {
       UpdateSuccess result;
       try {
+        String reportedTripId = rawTripUpdate.getTrip().getTripId();
         if (fuzzyTripMatcher != null) {
           var trip = fuzzyTripMatcher.match(feedId, rawTripUpdate.getTrip());
           rawTripUpdate = rawTripUpdate.toBuilder().setTrip(trip).build();
         }
 
+        if (reconcileStopSequence && reportedTripId.equals(rawTripUpdate.getTrip().getTripId())) {
+          rawTripUpdate = scheduledTripHandler.reconcileStopSequence(feedId, rawTripUpdate);
+        }
         var tripUpdate = new TripUpdate(feedId, rawTripUpdate, localDateNow);
         tripUpdate.validate();
 

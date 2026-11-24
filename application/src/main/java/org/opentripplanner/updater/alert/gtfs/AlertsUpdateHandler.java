@@ -123,7 +123,7 @@ public class AlertsUpdateHandler {
       }
 
       String routeId = null;
-      if (informed.hasRouteId()) {
+      if (!informed.getRouteId().isBlank()) {
         routeId = informed.getRouteId();
       }
 

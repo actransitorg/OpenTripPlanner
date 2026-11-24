@@ -47,6 +47,7 @@ public class PollingTripUpdater extends PollingGraphUpdater<TransitRealTimeUpdat
    * Set only if we should attempt to match the trip_id from other data in TripDescriptor
    */
   private final boolean fuzzyTripMatching;
+  private final boolean reconcileStopSequence;
 
   public PollingTripUpdater(
     PollingTripUpdaterParameters parameters,
@@ -60,6 +61,7 @@ public class PollingTripUpdater extends PollingGraphUpdater<TransitRealTimeUpdat
     this.backwardsDelayPropagationType = parameters.backwardsDelayPropagationType();
     this.adapter = adapter;
     this.fuzzyTripMatching = parameters.fuzzyTripMatching();
+    this.reconcileStopSequence = parameters.reconcileStopSequence();
 
     this.recordMetrics = BatchTripUpdateMetrics.batch(parameters);
 
@@ -86,6 +88,7 @@ public class PollingTripUpdater extends PollingGraphUpdater<TransitRealTimeUpdat
       TripUpdateGraphWriterRunnable runnable = new TripUpdateGraphWriterRunnable(
         adapter,
         fuzzyTripMatching,
+        reconcileStopSequence,
         forwardsDelayPropagationType,
         backwardsDelayPropagationType,
         incrementality,

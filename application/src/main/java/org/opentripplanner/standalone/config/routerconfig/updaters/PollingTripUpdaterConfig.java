@@ -2,6 +2,7 @@ package org.opentripplanner.standalone.config.routerconfig.updaters;
 
 import static org.opentripplanner.standalone.config.framework.json.EnumMapper.docEnumValueList;
 import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V1_5;
+import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V2_11;
 import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V2_2;
 import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V2_3;
 import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V2_8;
@@ -37,6 +38,18 @@ public class PollingTripUpdaterConfig {
         .of("fuzzyTripMatching")
         .since(V1_5)
         .summary("If the trips should be matched fuzzily.")
+        .asBoolean(false),
+      c
+        .of("reconcileStopSequence")
+        .since(V2_11)
+        .summary("Reconcile nonstandard stop sequences on scheduled trip updates.")
+        .description(
+          "Enable for feeds with known stop-sequence errors. Ordered one-based stop positions " +
+            "are mapped to GTFS sequences only when every explicit stop ID uniquely identifies that position. " +
+            "Out-of-order records are sorted only when all sequence and stop ID pairs match the schedule, " +
+            "their sequences are distinct, and their reported absolute times are chronological. " +
+            "Platform assignments and changes to the stop pattern use normal GTFS-RT matching."
+        )
         .asBoolean(false),
       c
         .of("forwardsDelayPropagationType")

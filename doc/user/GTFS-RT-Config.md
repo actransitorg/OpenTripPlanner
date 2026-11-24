@@ -82,6 +82,7 @@ HTTP request and polled regularly.
 | [forwardsDelayPropagationType](#u__5__forwardsDelayPropagationType)   |      `enum`     | How forwards propagation should be handled.                                | *Optional* | `"default"`          |  2.8  |
 | frequency                                                             |    `duration`   | How often the data should be downloaded.                                   | *Optional* | `"PT1M"`             |  1.5  |
 | fuzzyTripMatching                                                     |    `boolean`    | If the trips should be matched fuzzily.                                    | *Optional* | `false`              |  1.5  |
+| [reconcileStopSequence](#u__5__reconcileStopSequence)                 |    `boolean`    | Reconcile nonstandard stop sequences on scheduled trip updates.            | *Optional* | `false`              |  2.11 |
 | [url](#u__5__url)                                                     |     `string`    | The URL of the GTFS-RT resource.                                           | *Required* |                      |  1.5  |
 | [headers](#u__5__headers)                                             | `map of string` | HTTP headers to add to the request. Any header key, value can be inserted. | *Optional* |                      |  2.3  |
 
@@ -128,6 +129,15 @@ How forwards propagation should be handled.
    For `SKIPPED` stops without time given, interpolate the estimated time using the ratio between
    scheduled and real times from the previous to the next stop.
 
+
+<h4 id="u__5__reconcileStopSequence">reconcileStopSequence</h4>
+
+**Since version:** `2.11` ∙ **Type:** `boolean` ∙ **Cardinality:** `Optional` ∙ **Default value:** `false`   
+**Path:** /updaters/[5] 
+
+Reconcile nonstandard stop sequences on scheduled trip updates.
+
+Enable for feeds with known stop-sequence errors. Ordered one-based stop positions are mapped to GTFS sequences only when every explicit stop ID uniquely identifies that position. Out-of-order records are sorted only when all sequence and stop ID pairs match the schedule, their sequences are distinct, and their reported absolute times are chronological. Platform assignments and changes to the stop pattern use normal GTFS-RT matching.
 
 <h4 id="u__5__url">url</h4>
 

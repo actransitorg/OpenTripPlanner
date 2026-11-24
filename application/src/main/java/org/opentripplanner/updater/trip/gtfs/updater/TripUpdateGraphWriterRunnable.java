@@ -24,6 +24,7 @@ public class TripUpdateGraphWriterRunnable
   private final List<TripUpdate> updates;
 
   private final boolean fuzzyTripMatching;
+  private final boolean reconcileStopSequence;
 
   private final ForwardsDelayPropagationType forwardsDelayPropagationType;
   private final BackwardsDelayPropagationType backwardsDelayPropagationType;
@@ -35,6 +36,7 @@ public class TripUpdateGraphWriterRunnable
   public TripUpdateGraphWriterRunnable(
     GtfsRealTimeTripUpdateAdapter adapter,
     boolean fuzzyTripMatching,
+    boolean reconcileStopSequence,
     ForwardsDelayPropagationType forwardsDelayPropagationType,
     BackwardsDelayPropagationType backwardsDelayPropagationType,
     UpdateIncrementality updateIncrementality,
@@ -44,6 +46,7 @@ public class TripUpdateGraphWriterRunnable
   ) {
     this.adapter = adapter;
     this.fuzzyTripMatching = fuzzyTripMatching;
+    this.reconcileStopSequence = reconcileStopSequence;
     this.forwardsDelayPropagationType = forwardsDelayPropagationType;
     this.backwardsDelayPropagationType = backwardsDelayPropagationType;
     this.updateIncrementality = updateIncrementality;
@@ -55,7 +58,7 @@ public class TripUpdateGraphWriterRunnable
   @Override
   public void run(TransitRealTimeUpdateContext context) {
     var result = adapter
-      .forUpdate(context.timetableRepository())
+      .forUpdate(context.timetableRepository(), reconcileStopSequence)
       .applyTripUpdates(
         fuzzyTripMatching ? context.gtfsRealtimeFuzzyTripMatcher() : null,
         forwardsDelayPropagationType,

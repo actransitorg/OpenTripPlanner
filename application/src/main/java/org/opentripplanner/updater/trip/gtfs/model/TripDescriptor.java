@@ -29,7 +29,7 @@ public class TripDescriptor {
 
   Optional<String> routeId() {
     return tripDescriptor.hasRouteId()
-      ? Optional.of(tripDescriptor.getRouteId())
+      ? Optional.of(tripDescriptor.getRouteId()).filter(StringUtils::hasValue)
       : Optional.empty();
   }
 

@@ -205,6 +205,7 @@ public class MqttGtfsRealtimeUpdater implements GraphUpdater<TransitRealTimeUpda
         new TripUpdateGraphWriterRunnable(
           adapter,
           fuzzyTripMatching,
+          false,
           forwardsDelayPropagationType,
           backwardsDelayPropagationType,
           updateIncrementality,

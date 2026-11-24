@@ -4,6 +4,7 @@ import static org.opentripplanner.updater.spi.UpdateErrorType.NO_SERVICE_ON_DATE
 import static org.opentripplanner.updater.spi.UpdateErrorType.NO_UPDATES;
 import static org.opentripplanner.updater.spi.UpdateErrorType.TRIP_NOT_FOUND;
 
+import com.google.transit.realtime.GtfsRealtime;
 import java.util.HashMap;
 import java.util.Map;
 import org.opentripplanner.core.model.id.FeedScopedId;
@@ -123,6 +124,26 @@ class ScheduledTripHandler {
 
   private TripPattern getPatternForTripId(FeedScopedId tripId) {
     Trip trip = buffer.getTrip(tripId);
-    return buffer.findPattern(trip);
+    return trip == null ? null : buffer.findPattern(trip);
+  }
+
+  GtfsRealtime.TripUpdate reconcileStopSequence(String feedId, GtfsRealtime.TripUpdate update) {
+    var descriptor = update.getTrip();
+    if (
+      descriptor.getScheduleRelationship() !=
+        GtfsRealtime.TripDescriptor.ScheduleRelationship.SCHEDULED ||
+      descriptor.getTripId().isBlank() ||
+      update.getStopTimeUpdateCount() == 0
+    ) {
+      return update;
+    }
+    var id = new FeedScopedId(feedId, descriptor.getTripId());
+    var pattern = getPatternForTripId(id);
+    if (pattern == null) {
+      return update;
+    }
+    var timetable = pattern.getScheduledTimetable();
+    var times = timetable.getTripTimes(id);
+    return times == null ? update : StopSequenceReconciler.reconcile(update, timetable, times);
   }
 }

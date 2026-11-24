@@ -43,6 +43,14 @@ public class AlertsUpdateHandlerTest {
   }
 
   @Test
+  public void testAgencyAlertWithEmptyOptionalRouteId() {
+    var selector = GtfsRealtime.EntitySelector.newBuilder().setAgencyId("AC").setRouteId("");
+    var alert = processOneAlert(Alert.newBuilder().addInformedEntity(selector).build());
+    assertThat(alert.entities()).hasSize(1);
+    assertThat(alert.entities().iterator().next()).isInstanceOf(EntitySelector.Agency.class);
+  }
+
+  @Test
   public void testAlertWithTimePeriodConsideringEarlyStart() {
     GtfsRealtime.Alert alert = GtfsRealtime.Alert.newBuilder()
       .addActivePeriod(GtfsRealtime.TimeRange.newBuilder().setStart(10).setEnd(20).build())

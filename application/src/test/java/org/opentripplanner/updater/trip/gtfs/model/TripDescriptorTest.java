@@ -12,6 +12,13 @@ import org.opentripplanner.updater.spi.UpdateException;
 class TripDescriptorTest {
 
   @ParameterizedTest
+  @ValueSource(strings = { "", " " })
+  void blankRouteIdIsAbsent(String routeId) {
+    var raw = GtfsRealtime.TripDescriptor.newBuilder().setRouteId(routeId).build();
+    assertThat(new TripDescriptor(raw).routeId()).isEmpty();
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = { "12:00:00", "12:00" })
   void startTime(String time) {
     var raw = GtfsRealtime.TripDescriptor.newBuilder().setStartTime(time).build();

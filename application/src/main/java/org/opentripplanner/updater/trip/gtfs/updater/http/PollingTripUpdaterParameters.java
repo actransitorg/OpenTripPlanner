@@ -11,6 +11,7 @@ public record PollingTripUpdaterParameters(
   String configRef,
   Duration frequency,
   boolean fuzzyTripMatching,
+  boolean reconcileStopSequence,
   ForwardsDelayPropagationType forwardsDelayPropagationType,
   BackwardsDelayPropagationType backwardsDelayPropagationType,
 

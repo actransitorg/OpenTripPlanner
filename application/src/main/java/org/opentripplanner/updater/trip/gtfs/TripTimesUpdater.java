@@ -99,9 +99,9 @@ class TripTimesUpdater {
     ).toEpochSecond();
 
     var mapper = new StopPositionMapper(tripId, tripTimes, timetable);
-
-    for (var i = 0; i < tripUpdate.stopTimeUpdates().size(); i++) {
-      var update = tripUpdate.stopTimeUpdates().get(i);
+    var updates = tripUpdate.stopTimeUpdates();
+    for (var i = 0; i < updates.size(); i++) {
+      var update = updates.get(i);
       final int pos = mapper.stopPositionInPattern(i, update);
 
       var scheduledStopId = timetable.getPattern().getStop(pos).getId().getId();

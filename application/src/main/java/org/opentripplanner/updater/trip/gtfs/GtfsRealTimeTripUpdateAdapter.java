@@ -42,9 +42,17 @@ public class GtfsRealTimeTripUpdateAdapter {
    * they see in-progress real-time additions not yet committed to a published snapshot.
    */
   public GtfsRealTimeUpdateHandler forUpdate(TimetableRepository buffer) {
+    return forUpdate(buffer, false);
+  }
+
+  public GtfsRealTimeUpdateHandler forUpdate(
+    TimetableRepository buffer,
+    boolean reconcileStopSequence
+  ) {
     return new GtfsRealTimeUpdateHandler(
       buffer,
       localDateNow,
+      reconcileStopSequence,
       new ScheduledTripHandler(transitRepository, buffer, tripTimesUpdater, tripPatternCache),
       new NewTripHandler(transitRepository, buffer, tripTimesUpdater, tripPatternCache),
       new CanceledTripHandler(buffer),
