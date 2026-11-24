@@ -7,10 +7,18 @@ reported closures and measured freeway speeds during street routing.
 
 ## Build and serve regional transit
 
-Use the shaded JAR built from the `traffic-511` branch and Java 25. In a fresh clone of the
-fork, run `git switch traffic-511`, then `mvn -pl otp-shaded -am package -DskipTests` at the
-repository root with JDK 25, Maven, Node.js and npm available. The result is under
-`otp-shaded/target/`.
+Use JDK 25 and Maven to build the shaded JAR. From the root of a fresh clone of the fork, run
+these commands in PowerShell or Bash:
+
+```shell
+git switch traffic-511
+mvn -pl otp-shaded -am package -DskipTests -Dps -Dcs
+```
+
+The JAR is `otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar`. For this packaging command,
+`-Dps` skips Spotless formatting and `-Dcs` skips Checkstyle. To verify source changes, run
+`mvn -pl otp-shaded -am package -DskipTests -PprettierCheck` with Node.js and npm on the
+`PATH`. This checks formatting and runs Checkstyle.
 
 Use a data directory with the following layout on either platform:
 
