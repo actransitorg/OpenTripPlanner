@@ -12,13 +12,16 @@ these commands in PowerShell or Bash:
 
 ```shell
 git switch traffic-511
-mvn -pl otp-shaded -am package -DskipTests -Dps -Dcs
+mvn -pl otp-shaded -am package -DskipTests -Dps
 ```
 
-The JAR is `otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar`. For this packaging command,
-`-Dps` skips Spotless formatting and `-Dcs` skips Checkstyle. To verify source changes, run
-`mvn -pl otp-shaded -am package -DskipTests -PprettierCheck` with Node.js and npm on the
-`PATH`. This checks formatting and runs Checkstyle.
+The JAR is `otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar`. The `-Dps` flag skips the
+Spotless formatter and keeps Java Checkstyle enabled. If Spotless runs and cannot find npm on
+`PATH`, it reports `Can't automatically determine npm executable` once per file. Maven installs
+its own Node.js and npm for the debug client.
+
+To check formatting as well, make Node.js and npm available on `PATH` and run
+`mvn -pl otp-shaded -am package -DskipTests -PprettierCheck`.
 
 Use a data directory with the following layout on either platform:
 
