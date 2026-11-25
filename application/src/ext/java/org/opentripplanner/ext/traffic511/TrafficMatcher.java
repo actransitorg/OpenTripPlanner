@@ -22,6 +22,7 @@ import org.opentripplanner.ext.traffic511.feed.TrafficEvent;
 import org.opentripplanner.ext.traffic511.feed.TrafficEvent.Direction;
 import org.opentripplanner.ext.traffic511.feed.TrafficEvent.Effect;
 import org.opentripplanner.ext.traffic511.feed.TrafficEvent.Facility;
+import org.opentripplanner.framework.application.OtpAppException;
 import org.opentripplanner.street.graph.Graph;
 import org.opentripplanner.street.model.OsmWayIdentity;
 import org.opentripplanner.street.model.edge.StreetEdge;
@@ -53,13 +54,24 @@ public final class TrafficMatcher {
     this.graph = graph;
   }
 
-  public boolean hasRoadIdentities() {
+  public static void requireRoadIdentities(Graph graph) {
+    boolean hasStreetEdges = false;
     for (var edge : graph.findEdges(StreetEdge.class)) {
+      hasStreetEdges = true;
       if (edge.getWayIdentity() != null) {
-        return true;
+        return;
       }
     }
-    return false;
+    if (!hasStreetEdges) {
+      throw new OtpAppException(
+        "A Traffic511 updater is configured, but the graph contains no street edges. " +
+          "Include a routable OSM extract in the street graph build."
+      );
+    }
+    throw new OtpAppException(
+      "A Traffic511 updater is configured, but the street edges have no OSM road identities. " +
+        "Rebuild the street graph with Traffic511 enabled in otp-config.json."
+    );
   }
 
   public StreetTrafficSnapshot matchEvents(List<TrafficEvent> events) {

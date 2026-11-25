@@ -1,8 +1,10 @@
 package org.opentripplanner.ext.traffic511;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
@@ -20,6 +22,7 @@ import org.opentripplanner.ext.traffic511.feed.TrafficEvent;
 import org.opentripplanner.ext.traffic511.feed.TrafficEvent.Direction;
 import org.opentripplanner.ext.traffic511.feed.TrafficEvent.Effect;
 import org.opentripplanner.ext.traffic511.feed.TrafficEvent.Facility;
+import org.opentripplanner.framework.application.OtpAppException;
 import org.opentripplanner.routing.graph.kryosupport.KryoTestHelper;
 import org.opentripplanner.street.Scope;
 import org.opentripplanner.street.geometry.GeometryUtils;
@@ -40,6 +43,32 @@ class TrafficMatcherTest {
   private final Graph graph = new Graph();
   private final TrafficMatcher matcher = new TrafficMatcher(graph);
   private int label;
+
+  @Test
+  void trafficUpdatersRequireAtLeastOneStreetEdgeWithRoadIdentity() {
+    var from = vertex(-122.301, LAT);
+    var to = vertex(-122.300, LAT);
+    var noStreets = assertThrows(OtpAppException.class, () ->
+      TrafficMatcher.requireRoadIdentities(graph)
+    );
+    assertTrue(noStreets.getMessage().contains("no street edges"));
+
+    new StreetEdgeBuilder<>()
+      .withFromVertex(from)
+      .withToVertex(to)
+      .withGeometry(GeometryUtils.makeLineString(from.getCoordinate(), to.getCoordinate()))
+      .withName("Freeway")
+      .withMeterLength(100)
+      .withPermission(StreetTraversalPermission.ALL)
+      .buildAndConnect();
+    var noIdentities = assertThrows(OtpAppException.class, () ->
+      TrafficMatcher.requireRoadIdentities(graph)
+    );
+    assertTrue(noIdentities.getMessage().contains("no OSM road identities"));
+
+    road(to, from, "motorway", "I 80");
+    assertDoesNotThrow(() -> TrafficMatcher.requireRoadIdentities(graph));
+  }
 
   @Test
   void roadIdentitySurvivesGraphSerialization() {

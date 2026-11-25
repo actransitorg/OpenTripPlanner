@@ -189,6 +189,7 @@ public class ConstructApplication {
     LOG.info("Wiring up and configuring graph builder task.");
     return GraphBuilder.create(
       buildConfig(),
+      routerConfig().updaterConfig(),
       otpConfig().gbfsNetworks,
       graphBuilderDataSources,
       graph(),

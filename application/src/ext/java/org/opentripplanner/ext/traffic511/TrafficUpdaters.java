@@ -68,13 +68,8 @@ public final class TrafficUpdaters {
   }
 
   private static TrafficMatcher matcherFor(Graph graph) {
-    var matcher = new TrafficMatcher(graph);
-    if (!matcher.hasRoadIdentities()) {
-      throw new IllegalArgumentException(
-        "Build the street graph with the Traffic511 feature enabled before configuring traffic updaters."
-      );
-    }
-    return matcher;
+    TrafficMatcher.requireRoadIdentities(graph);
+    return new TrafficMatcher(graph);
   }
 
   @FunctionalInterface

@@ -12,6 +12,7 @@ import org.opentripplanner.ext.emission.EmissionRepository;
 import org.opentripplanner.ext.empiricaldelay.EmpiricalDelayRepository;
 import org.opentripplanner.ext.stopconsolidation.StopConsolidationRepository;
 import org.opentripplanner.ext.taxi.TaxiRepository;
+import org.opentripplanner.ext.traffic511.TrafficMatcher;
 import org.opentripplanner.framework.application.OTPFeature;
 import org.opentripplanner.framework.application.OtpAppException;
 import org.opentripplanner.gbfs.network.GbfsNetworkOverrides;
@@ -34,6 +35,7 @@ import org.opentripplanner.transfer.regular.TransferRepository;
 import org.opentripplanner.transit.dataimport.TimetableDataImport;
 import org.opentripplanner.transit.service.TransitRepository;
 import org.opentripplanner.transit.transfer.regular.RegularTransferBuildRepository;
+import org.opentripplanner.updater.UpdatersParameters;
 import org.opentripplanner.utils.lang.OtpNumberFormat;
 import org.opentripplanner.utils.time.DurationUtils;
 import org.slf4j.Logger;
@@ -82,6 +84,7 @@ public class GraphBuilder implements Runnable {
    */
   public static GraphBuilder create(
     BuildConfig config,
+    UpdatersParameters updaters,
     GbfsNetworkOverrides gbfsNetworkOverrides,
     GraphBuilderDataSources dataSources,
     Graph graph,
@@ -219,6 +222,14 @@ public class GraphBuilder implements Runnable {
     graphBuilder.addModuleOptional(factory.dataOverlayFactory(), OTPFeature.DataOverlay);
 
     graphBuilder.addModule(factory.calculateWorldEnvelopeModule());
+
+    if (
+      !updaters.getTraffic511Parameters().isEmpty() ||
+      !updaters.getPemsParameters().isEmpty() ||
+      !updaters.getTrafficReplayParameters().isEmpty()
+    ) {
+      graphBuilder.addModule(() -> TrafficMatcher.requireRoadIdentities(graph));
+    }
 
     return graphBuilder;
   }
