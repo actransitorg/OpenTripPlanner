@@ -1,5 +1,7 @@
 {
   "updaters": [
+    { "type": "traffic-511", "frequency": "10m", "maxAge": "30m" },
+    { "type": "caltrans-pems", "frequency": "5m", "maxAge": "30m" },
     {
       "type": "stop-time-updater",
       "feedId": "RG",

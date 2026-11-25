@@ -8,8 +8,8 @@ import java.util.Map;
 
 public final class PemsClient {
 
-  private static final URI STATIONS = URI.create("https://pems.dot.ca.gov/feeds/vds_config.xml");
-  private static final URI SPEEDS = URI.create(
+  static final URI STATIONS = URI.create("https://pems.dot.ca.gov/feeds/vds_config.xml");
+  static final URI SPEEDS = URI.create(
     "https://pems.dot.ca.gov/feeds/D4/Data/5min/5minagg_latest.txt"
   );
   private final FeedHttp http;

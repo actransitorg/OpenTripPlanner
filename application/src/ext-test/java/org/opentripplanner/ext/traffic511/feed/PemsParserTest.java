@@ -58,15 +58,4 @@ class PemsParserTest {
     assertEquals(TrafficEvent.Direction.EAST, station.direction());
     assertEquals(8.9, station.absolutePostmile());
   }
-
-  @Test
-  void trafficBudgetIncludesPaginationAndAllowsNewHour() throws IOException {
-    var budget = new Traffic511Client.RollingBudget();
-    Instant now = Instant.parse("2026-11-24T16:00:00Z");
-    for (int i = 0; i < 24; ++i) {
-      budget.reserve(now);
-    }
-    assertThrows(IOException.class, () -> budget.reserve(now.plusSeconds(3599)));
-    budget.reserve(now.plusSeconds(3600));
-  }
 }

@@ -1,5 +1,7 @@
 
 # Files
+.env
+.env.*
 .classpath
 .claude/*
 !.claude/settings.json

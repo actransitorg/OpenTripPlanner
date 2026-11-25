@@ -17,10 +17,10 @@ public class Traffic511Config {
       frequency(c, Duration.ofMinutes(10)),
       maxAge(c),
       c
-        .of("apiKeyEnvironmentVariable")
+        .of("cacheApiKeyEnvironmentVariable")
         .since(V2_11)
-        .summary("Name of the environment variable containing the Bay Area 511 API key.")
-        .asString("511_API_KEY")
+        .summary("Name of the environment variable containing the AC Transit Cache client key.")
+        .asString("ACTRANSIT_CACHE_API_KEY")
     );
   }
 

@@ -1,1 +1,2 @@
 build_publish.sh text eol=lf
+prepare.sh text eol=lf

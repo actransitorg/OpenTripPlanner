@@ -47,14 +47,12 @@ public final class TrafficUpdaters {
     var publisher = new TrafficSnapshotPublisher();
     List<GraphUpdater<?>> updaters = new ArrayList<>();
     for (var p : events) {
-      var client = new Traffic511Client(p.apiKeyEnvironmentVariable(), HTTP_TIMEOUT);
+      var client = new Traffic511Client(p.cacheApiKeyEnvironmentVariable(), HTTP_TIMEOUT);
       updaters.add(
-        new Poller(p, Source.EVENTS, publisher, () ->
-          new Update(
-            matcher.matchEvents(client.fetchEvents(p.maxAge())),
-            Instant.now().plus(p.maxAge())
-          )
-        )
+        new Poller(p, Source.EVENTS, publisher, () -> {
+          var feed = client.fetchEvents(p.maxAge());
+          return new Update(matcher.matchEvents(feed.events()), feed.expiresAt());
+        })
       );
       updaters.add(
         new Poller(p, Source.WORK_ZONES, publisher, () -> {

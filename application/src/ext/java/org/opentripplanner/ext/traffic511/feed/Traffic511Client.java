@@ -2,84 +2,97 @@ package org.opentripplanner.ext.traffic511.feed;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 public final class Traffic511Client {
 
-  private static final String HOST = "https://api.511.org/traffic/";
-  // Leave the rest of the default 60 requests per token per hour for regional GTFS-RT and other
-  // consumers. Count every attempted page, including failures. One token should use one env name.
-  private static final int REQUESTS_PER_HOUR = 24;
-  private static final ConcurrentHashMap<String, RollingBudget> BUDGETS = new ConcurrentHashMap<>();
-  private final String apiKeyEnvironmentVariable;
+  private final URI cache;
+  private final Supplier<String> cacheKey;
   private final FeedHttp http;
-  private final RollingBudget budget;
 
-  public Traffic511Client(String apiKeyEnvironmentVariable, Duration timeout) {
-    this.apiKeyEnvironmentVariable = apiKeyEnvironmentVariable;
-    this.http = new FeedHttp(timeout);
-    this.budget = BUDGETS.computeIfAbsent(apiKeyEnvironmentVariable, ignored ->
-      new RollingBudget()
+  public Traffic511Client(String cacheApiKeyEnvironmentVariable, Duration timeout) {
+    this(
+      cacheBase(System.getenv("ACTRANSIT_CACHE_BASE_URL")),
+      () -> System.getenv(cacheApiKeyEnvironmentVariable),
+      new FeedHttp(timeout)
     );
   }
 
-  public List<TrafficEvent> fetchEvents(Duration maxAge) throws IOException, InterruptedException {
-    var events = new ArrayList<TrafficEvent>();
-    var openIncidentCutoff = Instant.now().plus(maxAge);
-    int offset = 0;
-    do {
-      var page = http.read(
-        endpoint("events?format=json&status=ACTIVE&limit=500&offset=" + offset),
-        "511 Events",
-        input -> Traffic511Parser.readEvents(input, openIncidentCutoff)
-      );
-      events.addAll(page.events());
-      if (page.nextOffset() != -1 && page.nextOffset() <= offset) {
-        throw new IOException("511 event pagination failed to advance");
+  Traffic511Client(URI cache, Supplier<String> cacheKey, FeedHttp http) {
+    this.cache = cache;
+    this.cacheKey = cacheKey;
+    this.http = http;
+  }
+
+  static URI cacheBase(@Nullable String value) {
+    if (value != null) {
+      try {
+        var base = URI.create(value.strip());
+        if (
+          "https".equalsIgnoreCase(base.getScheme()) &&
+          base.getHost() != null &&
+          base.getUserInfo() == null &&
+          base.getRawQuery() == null &&
+          base.getRawFragment() == null
+        ) {
+          return URI.create(base.toString().replaceFirst("/+$", "") + "/");
+        }
+      } catch (IllegalArgumentException ignored) {
+        // Invalid input can contain credentials.
       }
-      offset = page.nextOffset();
-    } while (offset != -1);
-    return List.copyOf(events);
+    }
+    throw new IllegalArgumentException(
+      "Set ACTRANSIT_CACHE_BASE_URL to the HTTPS base URL for the 511 feeds."
+    );
+  }
+
+  public record EventFeed(List<TrafficEvent> events, Instant expiresAt) {}
+
+  public EventFeed fetchEvents(Duration maxAge) throws IOException, InterruptedException {
+    return http.readCache(
+      cache.resolve("traffic/events"),
+      "511 Events",
+      key(),
+      (input, validatedAt) -> {
+        var expiresAt = validatedAt.plus(maxAge);
+        var page = Traffic511Parser.readEvents(input, expiresAt);
+        if (page.nextOffset() != -1) {
+          throw new IOException("Incomplete cached Events dataset");
+        }
+        return new EventFeed(page.events(), expiresAt);
+      }
+    );
   }
 
   public Traffic511Parser.WorkZoneFeed fetchWorkZoneFeed()
     throws IOException, InterruptedException {
-    return http.read(
-      endpoint("wzdx?includeAllDefinedEnums=true&allActiveAndFutureEvents=true"),
+    return http.readCache(
+      cache.resolve("traffic/work-zones"),
       "511 WZDx",
-      Traffic511Parser::readWorkZoneFeed
+      key(),
+      (input, validatedAt) -> Traffic511Parser.readWorkZoneFeed(input)
     );
   }
 
-  private URI endpoint(String path) throws IOException {
-    var key = System.getenv(apiKeyEnvironmentVariable);
-    if (key == null || key.isBlank()) {
-      throw new IOException("511 API key environment variable is unset");
-    }
-    budget.reserve(Instant.now());
-    return URI.create(HOST + path + "&api_key=" + URLEncoder.encode(key, StandardCharsets.UTF_8));
+  <T> T readFeed(String route, FeedHttp.Decoder<T> decoder)
+    throws IOException, InterruptedException {
+    return readCachedFeed(route, (input, validatedAt) -> decoder.read(input));
   }
 
-  static final class RollingBudget {
+  <T> T readCachedFeed(String route, FeedHttp.CachedDecoder<T> decoder)
+    throws IOException, InterruptedException {
+    return http.readCache(cache.resolve(route), route, key(), decoder);
+  }
 
-    private final ArrayDeque<Instant> attempts = new ArrayDeque<>();
-
-    synchronized void reserve(Instant now) throws IOException {
-      Instant oldest = now.minus(Duration.ofHours(1));
-      while (!attempts.isEmpty() && !attempts.getFirst().isAfter(oldest)) {
-        attempts.removeFirst();
-      }
-      if (attempts.size() >= REQUESTS_PER_HOUR) {
-        throw new IOException("511 traffic request budget exhausted");
-      }
-      attempts.addLast(now);
+  String key() throws IOException {
+    var key = cacheKey.get();
+    if (key == null || key.isBlank()) {
+      throw new IOException("AC Transit Cache client key environment variable is unset");
     }
+    return key;
   }
 }

@@ -38,11 +38,18 @@ docker build -f script/traffic-511/Containerfile --build-arg useJarShaded=0 -t o
 docker build -f script/traffic-511/Containerfile --build-arg useJarShaded=1 -t otp-traffic-511:local .
 ```
 
-Direct source builds default to `traffic-511` on the AC Transit fork. Add
-`--build-arg OTP_REF=<full-commit-sha>` to pin a revision. Both modes produce a Temurin 25
-Alpine JRE image with `/app/app.jar`, the matching `/app/script/` directory, and port 8080.
+Direct source builds fetch `traffic-511` from the AC Transit fork. Select a published revision
+that includes the Java capture command and `prepare.sh` using `--build-arg OTP_REF=<full-commit-sha>`.
+For local changes, use `build_publish.sh` or package a shaded JAR built from the same checkout.
+Both modes produce a Temurin 25
+Alpine JRE image with `/app/app.jar`, the traffic configuration, and port 8080.
 The entrypoint supplies `/var/opentripplanner` when you pass `--build --save` or `--load --serve`.
-The feed capture and refresh commands below run on the host with their Python dependencies.
+The same JAR contains the live road updaters and the `Traffic511Capture` command used by
+`/app/prepare.sh`. Java 25 is the only runtime dependency for serving, capture and refresh.
+
+The former host command `script/capture-traffic-511.py` is deprecated. It forwards its
+arguments to the Java command using the checkout's shaded JAR or the file named by `OTP_JAR`.
+Use the Java or Docker examples below for new deployments.
 
 ### Build the JAR directly
 
@@ -70,6 +77,42 @@ formatting as CI does, use `mvn test -PprettierCheck` in the same shell. If Spot
 `Can't automatically determine npm executable`, check `npm --version` there. Running
 `mvn clean` removes the project-local toolchain, so run it before the setup commands.
 
+### Configure cache access
+
+All three capture modes (regional snapshot, live transit refresh, and road replay capture)
+and the live `traffic-511` Java updater require two environment variables.
+
+| Variable | Required value |
+| --- | --- |
+| `ACTRANSIT_CACHE_BASE_URL` | The environment's absolute HTTPS 511 feed prefix, including the path through `/feeds/511`. A trailing slash is optional. Omit credentials, query parameters and fragments. |
+| `ACTRANSIT_CACHE_API_KEY` | The AC Transit Cache **client key** provisioned for OTP in that environment. The clients send it in the `X-Api-Key` header. An upstream `511_API_KEY` belongs to the cache collector. |
+
+Set both variables in the process environment, or create a local `.env` file in the directory
+where you run the commands. Replace both placeholders with your deployment values.
+
+```dotenv
+ACTRANSIT_CACHE_BASE_URL=https://cache.example.invalid/cache/v1/feeds/511
+ACTRANSIT_CACHE_API_KEY=<OTP cache client key>
+```
+
+Git ignores `.env` and `.env.*`. Docker reads the file with `--env-file .env`. Java inherits
+the environment of the shell or service that starts it. When using exported variables with Docker, replace `--env-file .env` with
+`--env ACTRANSIT_CACHE_BASE_URL --env ACTRANSIT_CACHE_API_KEY`.
+
+The cache client needs read access to the following routes relative to the configured prefix.
+
+| Operation | Feeds required |
+| --- | --- |
+| Regional snapshot | `gtfs-static/rg` and all three regional realtime feeds below |
+| Live transit refresh | `gtfs-rt/trip-updates/rg`, `gtfs-rt/service-alerts/rg`, `gtfs-rt/vehicle-positions/rg` |
+| Road replay capture | `traffic/events`, `traffic/work-zones`, the three regional realtime feeds, and public Caltrans PeMS data |
+| Live road updater | `traffic/events` and `traffic/work-zones` |
+
+A cache HTTP 401 indicates a missing or invalid cache client key. A 403 means the key lacks
+permission for that feed. A 503 means the cache has no snapshot it can serve for that feed.
+Snapshot capture publishes the destination only after all required downloads succeed.
+Serving a completed offline replay requires the captured files.
+
 ### Set up regional feeds
 
 Use one data directory and mount it at `/var/opentripplanner` in the container.
@@ -78,20 +121,21 @@ Use one data directory and mount it at `/var/opentripplanner` in the container.
 bayarea/
   build-config.json
   router-config.json
+  otp-config.json
   bay-area.osm.pbf
   511-snapshot/    RG.gtfs.zip, tripupdates.pb, alerts.pb, vehiclepositions.pb, captured-at.txt
   511-live/        tripupdates.pb, alerts.pb, vehiclepositions.pb
   graph.obj        created by --build --save
 ```
 
-Copy the two starter files from `script/traffic-511/config/` when setting up a new data
+Copy the three starter files from `script/traffic-511/config/` when setting up a new data
 directory. Keep your edited copies for subsequent builds. They configure the regional
 timetable and realtime updaters with feed ID `RG`. The image sets `RG_STATIC_URI` to
 `file:///var/opentripplanner/511-snapshot/RG.gtfs.zip` and `RG_RT_URI` to
 `file:///var/opentripplanner/511-live`. The Windows example sets equivalent local paths.
-Capture requests use `operator_id=RG` for static GTFS and `agency=RG` for TripUpdates,
-ServiceAlerts and VehiclePositions. For road closures, also enable the sandbox in `otp-config.json`
-before building the graph. [Road configuration](#add-road-conditions-to-street-legs) · [OTP configuration substitution](../Configuration.md#system-environment-and-project-information-substitution)
+The starter configuration enables the road sandbox during graph build and registers the 511
+and Caltrans PeMS Java updaters at serve time. When adopting it in an existing deployment,
+merge those settings into your current configs and rebuild the graph. [Road configuration](#add-road-conditions-to-street-legs) · [OTP configuration substitution](../Configuration.md#system-environment-and-project-information-substitution)
 
 For live service, run the refresh command alongside OTP. It publishes each completed download
 atomically. TripUpdates refresh every three minutes and ServiceAlerts and VehiclePositions every
@@ -105,17 +149,31 @@ identifies each stop and supports its position on that trip.
 
 ### Windows PowerShell
 
-From the repository root, set `JAVA_HOME` to the installed JDK 25 directory. Set `511_API_KEY`
-in the account running the download commands. If you just saved a Windows user environment
-variable, open a new PowerShell window to pick it up. Install `uv` for the Python commands.
+From the repository root, set `JAVA_HOME` to the installed Java 25 directory. If you keep
+the cache settings in a local `.env`, load its two unquoted `NAME=value` entries into
+each PowerShell session that will run capture, refresh or the live router.
+
+```powershell
+Get-Content -LiteralPath .env | ForEach-Object {
+  if ($_ -match '^(ACTRANSIT_CACHE_BASE_URL|ACTRANSIT_CACHE_API_KEY)=(.+)$') {
+    [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+  }
+}
+```
 
 ```powershell
 $data = 'C:\otp-data'
 $java = Join-Path $env:JAVA_HOME 'bin\java.exe'
 $jar = (Resolve-Path 'otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar').Path
+$capture = 'org.opentripplanner.ext.traffic511.feed.Traffic511Capture'
 New-Item -ItemType Directory -Force $data | Out-Null
-Copy-Item script/traffic-511/config/*.json $data
-uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --regional-transit "$data\511-snapshot"
+Get-ChildItem script/traffic-511/config -File -Filter '*.json' | ForEach-Object {
+  $destination = Join-Path $data $_.Name
+  if (-not (Test-Path -LiteralPath $destination)) {
+    Copy-Item -LiteralPath $_.FullName -Destination $destination
+  }
+}
+& $java -cp $jar $capture --regional-transit "$data\511-snapshot"
 $env:RG_STATIC_URI = ([uri](Join-Path $data '511-snapshot\RG.gtfs.zip')).AbsoluteUri
 $env:RG_RT_URI = ([uri](Join-Path $data '511-live')).AbsoluteUri
 ```
@@ -124,7 +182,7 @@ Place the Bay Area OSM extract directly in `$data`. Start the refresh command in
 PowerShell window from the repository root. Wait for the three realtime files to appear.
 
 ```powershell
-uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --refresh-transit 'C:\otp-data\511-live'
+& "$env:JAVA_HOME\bin\java.exe" -cp 'otp-shaded/target/otp-shaded-2.11.0-SNAPSHOT.jar' org.opentripplanner.ext.traffic511.feed.Traffic511Capture --refresh-transit 'C:\otp-data\511-live'
 ```
 
 Build the graph and serve it in the first window.
@@ -136,30 +194,25 @@ Build the graph and serve it in the first window.
 
 ### Linux container
 
-The following commands use the AC Transit host directory as a single bind mount. From the
-repository root on the Docker host, prepare the directory and place the Bay Area `.osm.pbf`
-beside the two JSON files. The capture helper reads `511_API_KEY` from its environment. If the
-host secret is named `BAY_AREA_511_KEY`, the `env` command below passes it under the required
-name. If the helper already inherits `511_API_KEY`, invoke `uv` directly.
+Put `ACTRANSIT_CACHE_BASE_URL` and `ACTRANSIT_CACHE_API_KEY` in the host's Git-ignored
+`.env` file, one `NAME=value` per line. Place the Bay Area `.osm.pbf`
+in the mounted data directory. From the Docker host, run the preparation container.
 
 ```bash
 data=/opt/actransit/opentripplanner2.10/docker/graphs/bayarea
+image=${IMAGE:-otp-traffic-511:local}
 mkdir -p "$data"
-cp script/traffic-511/config/*.json "$data/"
-env "511_API_KEY=$BAY_AREA_511_KEY" uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --regional-transit "$data/511-snapshot"
+docker run --rm --env-file .env -v "$data:/var/opentripplanner" \
+  --entrypoint sh "$image" /app/prepare.sh
 ```
 
-Start the live refresh from the repository root in a second terminal or service.
+Preparation copies any missing starter configs, creates `511-snapshot` on the first run,
+then keeps the three files under `511-live` current. If the initial capture fails, the
+command exits and can be retried. Leave it running once the capture succeeds. In a second
+terminal, build the graph with the same host directory and image.
 
 ```bash
 data=/opt/actransit/opentripplanner2.10/docker/graphs/bayarea
-env "511_API_KEY=$BAY_AREA_511_KEY" uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py --refresh-transit "$data/511-live"
-```
-
-In the first terminal, build the initial graph with the sandbox image. The mount makes both
-feed directories visible to OTP and writes `graph.obj` back to the host.
-
-```bash
 image=${IMAGE:-otp-traffic-511:local}
 docker run --rm -v "$data:/var/opentripplanner" "$image" --build --save
 ```
@@ -179,9 +232,11 @@ docker run -d --name otp-traffic-511 --network middleware-network --ip 192.168.1
 POST `{"query":"{ feeds { feedId } }"}` as `application/json` to
 `http://127.0.0.1:9090/otp/gtfs/v1` for the container or
 `http://127.0.0.1:8080/otp/gtfs/v1` for native Windows. Check that the response includes
-`RG`. For a fixed replay, point `RG_RT_URI` at the captured `511-snapshot` directory, set
-each updater frequency to `0s`, and plan for the time in `captured-at.txt`. A complete
-regional capture can be replayed offline. [Bay Area replay results](Traffic511Replay.md)
+`RG`. For an offline regional transit replay, point `RG_RT_URI` at the captured
+`511-snapshot` directory, remove the two live road updaters from `router-config.json`, and
+set the three transit updater frequencies to `0s`. Plan for the time in `captured-at.txt`.
+To include captured road conditions, follow the road replay configuration below.
+[Bay Area replay results](Traffic511Replay.md)
 
 Rebuild the graph when adopting a new static timetable. This branch uses graph serialization
 version 293, so a graph built with version 292 also needs rebuilding.
@@ -197,8 +252,9 @@ when serving it. The builder retains the OSM road identity needed to match live 
 }
 ```
 
-Set `511_API_KEY` in the OTP server's environment. Configure either or both live providers in
-`router-config.json`. The 511 updater polls Events and Work Zones independently. The PeMS updater
+Set both cache environment variables on the OTP server. Configure either or both live providers in
+`router-config.json`. The 511 updater polls the cache routes `traffic/events` and `traffic/work-zones`
+independently. The cache collects and combines all upstream Events pages. The PeMS updater
 refreshes the station directory daily and receives five-minute observations.
 
 ```json
@@ -210,38 +266,34 @@ refreshes the station directory daily and receives five-minute observations.
 }
 ```
 
-Use `apiKeyEnvironmentVariable` to select a different variable for the 511 updater. The freshness
+Use `cacheApiKeyEnvironmentVariable` to select a different cache key variable for the 511 updater.
+When migrating a router with `apiKeyEnvironmentVariable`, replace that setting and provision the
+cache client credential in the selected variable. The freshness
 limit applies separately to each successful dataset. An incomplete refresh retains the previous
 complete dataset until it expires. A complete empty feed clears the source. Each request uses
 one consistent traffic snapshot. PeMS observations also expire at the traveler's traversal time.
 
-For example, when the Linux host exports `BAY_AREA_511_KEY`, set
-`"apiKeyEnvironmentVariable": "BAY_AREA_511_KEY"` on the `traffic-511` updater and add
-`--env BAY_AREA_511_KEY` to the serving container's Docker arguments. For regional transit alone
-the credential belongs to the download process.
-
-511's default allotment is 60 requests per hour per key, shared across consumers and endpoints.
-The road client allows 24 attempts per rolling hour per configured key variable in one process.
-The live transit command makes up to 32 additional requests per hour. Budget other deployments,
-one-off captures and consumers sharing a token separately. PeMS uses its own public endpoint.
-[511 API access](https://511.org/open-data/traffic) · [Caltrans PeMS](https://pems.dot.ca.gov/)
+The cache manages the upstream 511 credential and collection quota. PeMS uses its own public
+endpoint. [Caltrans PeMS](https://pems.dot.ca.gov/)
 
 ## Replay a trip
 
 1. Build a graph covering the test corridor. For transit trips, load the regional static GTFS
    matching the capture date and assign it the feed ID `RG`. [511 regional feeds](https://511.org/open-data/transit)
-2. From the repository root, run the following command with the API key in the environment.
+2. From the repository root, run the following command with both cache variables in the environment.
    Supply a new directory for each capture. The command saves the acquisition time, complete
    traffic datasets and all three regional GTFS-Realtime feeds.
 
    ```powershell
    $env:RG_ROAD_CAPTURE = (Join-Path $data 'replays/bay-area-01').Replace('\', '/')
-   uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py $env:RG_ROAD_CAPTURE
+   & $java -cp $jar $capture $env:RG_ROAD_CAPTURE
    $env:RG_RT_URI = ([uri]$env:RG_ROAD_CAPTURE).AbsoluteUri
    ```
 
    ```bash
-   env "511_API_KEY=$BAY_AREA_511_KEY" uv run --with gtfs-realtime-bindings python script/capture-traffic-511.py "$data/replays/bay-area-01"
+   docker run --rm --env-file .env -v "$data:/var/opentripplanner" --entrypoint java "$image" \
+     -cp /app/app.jar org.opentripplanner.ext.traffic511.feed.Traffic511Capture \
+     /var/opentripplanner/replays/bay-area-01
    ```
 
 3. Use the replay updater below in place of the two live traffic updaters. It reads the directory

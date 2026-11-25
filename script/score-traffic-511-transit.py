@@ -5,7 +5,7 @@ capture,agency_id,route_id,trip_start_date,trip_id,stop_sequence,stop_id,schedul
 road_excess_seconds,road_observed_at. The last two columns may be empty. Populate them only for
 verified shared-road hops, using excess travel time over typical running time from inputs available
 at capture. Get the scheduled arrival from the daily GTFS used to produce the capture's trip plan.
-capture is a directory (relative to the trials CSV) from capture-traffic-511.py.
+capture is a directory (relative to the trials CSV) from the Traffic511Capture Java command.
 """
 
 import argparse

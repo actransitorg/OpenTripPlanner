@@ -30,7 +30,7 @@ class Traffic511ConfigTest {
         """
         {
           "updaters": [
-            { "type": "traffic-511", "apiKeyEnvironmentVariable": "TEST_TOKEN" },
+            { "type": "traffic-511", "cacheApiKeyEnvironmentVariable": "TEST_TOKEN" },
             { "type": "caltrans-pems", "maxAge": "15m" },
             { "type": "traffic-511-replay", "directory": "capture" },
             { "type": "traffic-511-replay", "directory": "capture", "includeSpeeds": false }
@@ -42,7 +42,7 @@ class Traffic511ConfigTest {
     var events = config.getTraffic511Parameters();
     var pems = config.getPemsParameters();
     var replays = config.getTrafficReplayParameters();
-    assertEquals("TEST_TOKEN", events.getFirst().apiKeyEnvironmentVariable());
+    assertEquals("TEST_TOKEN", events.getFirst().cacheApiKeyEnvironmentVariable());
     assertEquals(Duration.ofMinutes(10), events.getFirst().frequency());
     assertEquals(Duration.ofMinutes(15), pems.getFirst().maxAge());
     assertEquals(Path.of("capture"), replays.getFirst().directory());

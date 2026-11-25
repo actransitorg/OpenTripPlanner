@@ -4,17 +4,24 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
 import javax.net.ssl.HttpsURLConnection;
+import org.jspecify.annotations.Nullable;
 
 /** Read-only transport for the fixed, public agency HTTPS endpoints. URLs may contain secrets. */
-final class FeedHttp {
+class FeedHttp {
 
   @FunctionalInterface
   interface Decoder<T> {
     T read(InputStream input) throws IOException;
+  }
+
+  @FunctionalInterface
+  interface CachedDecoder<T> {
+    T read(InputStream input, Instant validatedAt) throws IOException;
   }
 
   private final int timeoutMillis;
@@ -24,11 +31,16 @@ final class FeedHttp {
   }
 
   <T> T read(URI uri, String feed, Decoder<T> decoder) throws IOException, InterruptedException {
+    return readCache(uri, feed, null, (input, receivedAt) -> decoder.read(input));
+  }
+
+  <T> T readCache(URI uri, String feed, @Nullable String key, CachedDecoder<T> decoder)
+    throws IOException, InterruptedException {
     if (Thread.currentThread().isInterrupted()) {
       throw new InterruptedException();
     }
     try {
-      return download(uri, feed, decoder);
+      return download(uri, feed, key, decoder);
     } catch (FeedStatusException e) {
       throw e;
     } catch (IOException | RuntimeException e) {
@@ -37,12 +49,16 @@ final class FeedHttp {
     }
   }
 
-  private <T> T download(URI uri, String feed, Decoder<T> decoder) throws IOException {
+  <T> T download(URI uri, String feed, @Nullable String key, CachedDecoder<T> decoder)
+    throws IOException {
     var response = (HttpsURLConnection) uri.toURL().openConnection();
     response.setConnectTimeout(timeoutMillis);
     response.setReadTimeout(timeoutMillis);
     response.setInstanceFollowRedirects(false);
     response.setRequestProperty("Accept-Encoding", "gzip, deflate");
+    if (key != null) {
+      response.setRequestProperty("X-Api-Key", key);
+    }
     try {
       int status = response.getResponseCode();
       if (status != 200) {
@@ -53,7 +69,11 @@ final class FeedHttp {
         var raw = response.getInputStream();
         var input = decode(raw, encoding == null ? "" : encoding)
       ) {
-        return decoder.read(input);
+        var validatedAt =
+          key == null
+            ? Instant.now()
+            : Instant.parse(response.getHeaderField("X-Cache-Validated-At"));
+        return decoder.read(input, validatedAt);
       }
     } finally {
       response.disconnect();

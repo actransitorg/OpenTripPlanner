@@ -8,5 +8,5 @@ public record Traffic511Parameters(
   String configRef,
   Duration frequency,
   Duration maxAge,
-  String apiKeyEnvironmentVariable
+  String cacheApiKeyEnvironmentVariable
 ) implements PollingGraphUpdaterParameters {}
